@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.8)
 
 project("compute-pipeline")
 
+set(CMAKE_CXX_STANDARD_REQUIRED 20)
+set(CMAKE_CXX_STANDARD 20)
+
 find_package(Vulkan REQUIRED)
 
 add_executable(example example.cpp)
@@ -13,3 +16,4 @@ if(MSVC)
 else()
   target_compile_options(example PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
+

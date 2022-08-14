@@ -23,41 +23,45 @@
 //
 // For more information, please refer to <http://unlicense.org/>
 
-#include "vulkan/vulkan.h"
+#include "vulkan/vulkan.hpp"
 
 #include <iostream>
+#include <vector>
 
-#define BAIL_ON_BAD_RESULT(result) \
-  if ((result) != VK_SUCCESS) { fprintf(stderr, "Failure at %u %s\n", __LINE__, __FILE__); exit(-1); }
-  
-int main(int argc, const char * const argv[]) {
-  (void)argc;
-  (void)argv;
+#define BAIL_ON_BAD_RESULT(result)                                 \
+    if ((result) != VK_SUCCESS)                                    \
+    {                                                              \
+        fprintf(stderr, "Failure at %u %s\n", __LINE__, __FILE__); \
+        exit(-1);                                                  \
+    }
 
-  const VkApplicationInfo applicationInfo = {
-    VK_STRUCTURE_TYPE_APPLICATION_INFO,
-    0,
-    "VKComputeSample",
-    0,
-    "",
-    0,
-    VK_MAKE_VERSION(1, 0, 9)
-  };
-  
-  const VkInstanceCreateInfo instanceCreateInfo = {
-    VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-    0,
-    0,
-    &applicationInfo,
-    0,
-    0,
-    0,
-    0
-  };
-  
-  VkInstance instance;
-  BAIL_ON_BAD_RESULT(vkCreateInstance(&instanceCreateInfo, 0, &instance));
-  
-  uint32_t physicalDeviceCount = 0;
-  BAIL_ON_BAD_RESULT(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, 0));
+int main()
+{
+    constexpr vk::ApplicationInfo applicationInfo = []()
+    {
+        vk::ApplicationInfo temp;
+        temp.pApplicationName = "Compute-Pipeline";
+        temp.applicationVersion = 1;
+        temp.pEngineName = nullptr;
+        temp.engineVersion = 0;
+        temp.apiVersion = VK_MAKE_VERSION(1, 0, 9);
+        return temp;
+    }();
+
+    const std::vector<const char *> Layers = {"VK_LAYER_KHRONOS_validation"};
+    const vk::InstanceCreateInfo instanceCreateInfo(vk::InstanceCreateFlags(), &applicationInfo, Layers.size(), Layers.data());
+
+    const auto instance = vk::createInstance(instanceCreateInfo);
+
+    const auto physicalDevices = instance.enumeratePhysicalDevices();
+
+    std::cout << physicalDevices.size() << "\n";
+    std::cout << physicalDevices.front().getProperties().deviceName << "\n";
+    for (auto &p : physicalDevices.front().enumerateDeviceExtensionProperties())
+    {
+        std::cout << p.extensionName << "\n";
+    }
+
+    
+    return 0;
 }
