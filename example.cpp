@@ -23,22 +23,62 @@
 //
 // For more information, please refer to <http://unlicense.org/>
 
-#include "vulkan/vulkan.hpp"
-
 #include <iostream>
+#include <optional>
 #include <vector>
 
-#define BAIL_ON_BAD_RESULT(result)                                 \
-    if ((result) != VK_SUCCESS)                                    \
-    {                                                              \
-        fprintf(stderr, "Failure at %u %s\n", __LINE__, __FILE__); \
-        exit(-1);                                                  \
+#include "vulkan/vulkan.hpp"
+
+#define BAIL_ON_BAD_RESULT(result)                                                                                     \
+    if ((result) != VK_SUCCESS)                                                                                        \
+    {                                                                                                                  \
+        fprintf(stderr, "Failure at %u %s\n", __LINE__, __FILE__);                                                     \
+        exit(-1);                                                                                                      \
     }
+
+namespace
+{
+std::pair<VkResult, std::optional<size_t>> getBestComputeQueue(const vk::PhysicalDevice& physicalDevice)
+{
+    const auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
+
+    // first try and find a queue that has just the compute bit set
+    for (size_t i = 0; const auto& prop : queueFamilyProperties)
+    {
+        // mask out the sparse binding bit that we aren't caring about (yet!) and
+        // the transfer bit
+        const auto maskedFlags =
+            (~(vk::QueueFlagBits::eTransfer | vk::QueueFlagBits::eSparseBinding) & prop.queueFlags);
+
+        if (!(vk::QueueFlagBits::eGraphics & maskedFlags) && (vk::QueueFlagBits::eCompute & maskedFlags))
+        {
+            return {VK_SUCCESS, i};
+        }
+        ++i;
+    }
+
+    // lastly get any queue that'll work for us
+    for (size_t i = 0; const auto& prop : queueFamilyProperties)
+    {
+        // mask out the sparse binding bit that we aren't caring about (yet!) and
+        // the transfer bit
+        const auto maskedFlags =
+            (~(vk::QueueFlagBits::eTransfer | vk::QueueFlagBits::eSparseBinding) & prop.queueFlags);
+
+        if (vk::QueueFlagBits::eCompute & maskedFlags)
+        {
+            return {VK_SUCCESS, i};
+        }
+        ++i;
+    }
+
+    return {VK_ERROR_INITIALIZATION_FAILED, {}};
+}
+} // namespace
 
 int main()
 {
-    constexpr vk::ApplicationInfo applicationInfo = []()
-    {
+    constexpr vk::ApplicationInfo applicationInfo = []() {
         vk::ApplicationInfo temp;
         temp.pApplicationName = "Compute-Pipeline";
         temp.applicationVersion = 1;
@@ -48,20 +88,23 @@ int main()
         return temp;
     }();
 
-    const std::vector<const char *> Layers = {"VK_LAYER_KHRONOS_validation"};
-    const vk::InstanceCreateInfo instanceCreateInfo(vk::InstanceCreateFlags(), &applicationInfo, Layers.size(), Layers.data());
+    const std::vector<const char*> Layers = {"VK_LAYER_KHRONOS_validation"};
+    const vk::InstanceCreateInfo instanceCreateInfo(vk::InstanceCreateFlags(), &applicationInfo, Layers.size(),
+                                                    Layers.data());
 
     const auto instance = vk::createInstance(instanceCreateInfo);
 
     const auto physicalDevices = instance.enumeratePhysicalDevices();
 
-    std::cout << physicalDevices.size() << "\n";
-    std::cout << physicalDevices.front().getProperties().deviceName << "\n";
-    for (auto &p : physicalDevices.front().enumerateDeviceExtensionProperties())
+    for (auto& physDev : physicalDevices)
     {
-        std::cout << p.extensionName << "\n";
-    }
+        const auto [result, queueFamilyIndex] = getBestComputeQueue(physDev);
+        BAIL_ON_BAD_RESULT(result);
 
-    
+        // const float queuePrioritory = 1.0f;
+        const auto deviceQueueCreateInfo =
+            vk::DeviceQueueCreateInfo(vk::DeviceQueueCreateFlags(), *queueFamilyIndex, {});
+        std::cout << &deviceQueueCreateInfo << "\n";
+    }
     return 0;
 }
