@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "vulkan/vulkan.hpp"
+#include "vulkan/vulkan_raii.hpp"
 
 #define BAIL_ON_BAD_RESULT(result)                                                                                     \
     if ((result) != VK_SUCCESS)                                                                                        \
@@ -14,12 +15,12 @@
 
 namespace
 {
-std::pair<VkResult, std::optional<size_t>> getBestComputeQueue(const vk::PhysicalDevice& physicalDevice)
+std::pair<VkResult, std::optional<size_t>> getBestComputeQueue(const auto &physicalDevice)
 {
     const auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
 
     // first try and find a queue that has just the compute bit set
-    for (size_t i = 0; const auto& prop : queueFamilyProperties)
+    for (size_t i = 0; const auto &prop : queueFamilyProperties)
     {
         // mask out the sparse binding bit that we aren't caring about (yet!) and
         // the transfer bit
@@ -34,7 +35,7 @@ std::pair<VkResult, std::optional<size_t>> getBestComputeQueue(const vk::Physica
     }
 
     // lastly get any queue that'll work for us
-    for (size_t i = 0; const auto& prop : queueFamilyProperties)
+    for (size_t i = 0; const auto &prop : queueFamilyProperties)
     {
         // mask out the sparse binding bit that we aren't caring about (yet!) and
         // the transfer bit
@@ -64,15 +65,16 @@ int main()
         return temp;
     }();
 
-    const std::vector<const char*> Layers = {"VK_LAYER_KHRONOS_validation"};
+    const std::vector<const char *> Layers = {"VK_LAYER_KHRONOS_validation"};
     const vk::InstanceCreateInfo instanceCreateInfo(vk::InstanceCreateFlags(), &applicationInfo, Layers.size(),
                                                     Layers.data());
 
-    const auto instance = vk::createInstance(instanceCreateInfo);
+    const vk::raii::Context context;
+    const auto instance = vk::raii::Instance(context, instanceCreateInfo);
 
     const auto physicalDevices = instance.enumeratePhysicalDevices();
 
-    for (auto& physDev : physicalDevices)
+    for (auto &physDev : physicalDevices)
     {
         const auto [result, queueFamilyIndex] = getBestComputeQueue(physDev);
         if (!queueFamilyIndex)
@@ -84,7 +86,38 @@ int main()
         constexpr std::array queuePrioritory = {1.0f};
         const auto deviceQueueCreateInfo =
             vk::DeviceQueueCreateInfo(vk::DeviceQueueCreateFlags(), *queueFamilyIndex, queuePrioritory);
-        std::cout << &deviceQueueCreateInfo << "\n";
+
+        const std::array queueInfos = {deviceQueueCreateInfo};
+        const auto deviceCreateInfo = vk::DeviceCreateInfo(vk::DeviceCreateFlags(), queueInfos);
+
+        const auto device = vk::raii::Device(physDev, deviceCreateInfo);
+        const auto props = physDev.getMemoryProperties();
+
+        const int32_t bufferLength = 16384;
+        const auto bufferSize = sizeof(bufferLength) * bufferLength;
+
+        const auto memorySize = bufferSize * 2;
+
+        const auto memoryTypeIndex = [&props]() -> std::optional<size_t> {
+            for (const auto &k : std::views::iota(0u, props.memoryTypeCount))
+            {
+                std::cout << to_string(props.memoryTypes[k].propertyFlags) << "\n";
+                if ((vk::MemoryPropertyFlagBits::eHostVisible & props.memoryTypes[k].propertyFlags) &&
+                    (vk::MemoryPropertyFlagBits::eHostCoherent & props.memoryTypes[k].propertyFlags) &&
+                    (memorySize < props.memoryHeaps[props.memoryTypes[k].heapIndex].size))
+                {
+                    return k;
+                }
+            }
+            return {};
+        }();
+
+        if (!memoryTypeIndex)
+        {
+            BAIL_ON_BAD_RESULT(VK_ERROR_OUT_OF_HOST_MEMORY);
+        }
+
+        std::cout << *memoryTypeIndex << "\n";
     }
     return 0;
 }
