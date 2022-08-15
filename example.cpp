@@ -1,3 +1,4 @@
+#include <array>
 #include <iostream>
 #include <optional>
 #include <vector>
@@ -76,9 +77,9 @@ int main()
         const auto [result, queueFamilyIndex] = getBestComputeQueue(physDev);
         BAIL_ON_BAD_RESULT(result);
 
-        // const float queuePrioritory = 1.0f;
+        constexpr std::array queuePrioritory = {1.0f};
         const auto deviceQueueCreateInfo =
-            vk::DeviceQueueCreateInfo(vk::DeviceQueueCreateFlags(), *queueFamilyIndex, {});
+            vk::DeviceQueueCreateInfo(vk::DeviceQueueCreateFlags(), *queueFamilyIndex, queuePrioritory);
         std::cout << &deviceQueueCreateInfo << "\n";
     }
     return 0;
