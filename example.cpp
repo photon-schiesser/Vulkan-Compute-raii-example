@@ -75,7 +75,11 @@ int main()
     for (auto& physDev : physicalDevices)
     {
         const auto [result, queueFamilyIndex] = getBestComputeQueue(physDev);
-        BAIL_ON_BAD_RESULT(result);
+        if (!queueFamilyIndex)
+        {
+            BAIL_ON_BAD_RESULT(result);
+            exit(1);
+        }
 
         constexpr std::array queuePrioritory = {1.0f};
         const auto deviceQueueCreateInfo =
