@@ -1,6 +1,7 @@
 #include <array>
 #include <iostream>
 #include <optional>
+#include <ranges>
 #include <vector>
 
 #include "vulkan/vulkan.hpp"
@@ -15,12 +16,12 @@
 
 namespace
 {
-std::pair<VkResult, std::optional<size_t>> getBestComputeQueue(const auto &physicalDevice)
+std::pair<VkResult, std::optional<size_t>> getBestComputeQueue(const auto& physicalDevice)
 {
     const auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
 
     // first try and find a queue that has just the compute bit set
-    for (size_t i = 0; const auto &prop : queueFamilyProperties)
+    for (size_t i = 0; const auto& prop : queueFamilyProperties)
     {
         // mask out the sparse binding bit that we aren't caring about (yet!) and
         // the transfer bit
@@ -35,7 +36,7 @@ std::pair<VkResult, std::optional<size_t>> getBestComputeQueue(const auto &physi
     }
 
     // lastly get any queue that'll work for us
-    for (size_t i = 0; const auto &prop : queueFamilyProperties)
+    for (size_t i = 0; const auto& prop : queueFamilyProperties)
     {
         // mask out the sparse binding bit that we aren't caring about (yet!) and
         // the transfer bit
@@ -65,7 +66,7 @@ int main()
         return temp;
     }();
 
-    const std::vector<const char *> Layers = {"VK_LAYER_KHRONOS_validation"};
+    const std::vector<const char*> Layers = {"VK_LAYER_KHRONOS_validation"};
     const vk::InstanceCreateInfo instanceCreateInfo(vk::InstanceCreateFlags(), &applicationInfo, Layers.size(),
                                                     Layers.data());
 
@@ -74,7 +75,7 @@ int main()
 
     const auto physicalDevices = instance.enumeratePhysicalDevices();
 
-    for (auto &physDev : physicalDevices)
+    for (auto& physDev : physicalDevices)
     {
         const auto [result, queueFamilyIndex] = getBestComputeQueue(physDev);
         if (!queueFamilyIndex)
@@ -99,7 +100,7 @@ int main()
         const auto memorySize = bufferSize * 2;
 
         const auto memoryTypeIndex = [&props]() -> std::optional<size_t> {
-            for (const auto &k : std::views::iota(0u, props.memoryTypeCount))
+            for (const auto& k : std::views::iota(0u, props.memoryTypeCount))
             {
                 std::cout << to_string(props.memoryTypes[k].propertyFlags) << "\n";
                 if ((vk::MemoryPropertyFlagBits::eHostVisible & props.memoryTypes[k].propertyFlags) &&
@@ -118,6 +119,22 @@ int main()
         }
 
         std::cout << *memoryTypeIndex << "\n";
+
+        const vk::MemoryAllocateInfo memoryAllocateInfo(memorySize, *memoryTypeIndex);
+
+        const vk::raii::DeviceMemory memory(device, memoryAllocateInfo);
+
+        {
+            int32_t* payload = static_cast<int32_t*>(memory.mapMemory(0, memorySize));
+            for (uint32_t k = 1; k < memorySize / sizeof(int32_t); k++)
+            {
+                payload[k] = std::rand();
+            }
+        }
+
+        std::cout << to_string(memory.debugReportObjectType) << "\n";
+
+        memory.unmapMemory();
     }
     return 0;
 }
