@@ -2,6 +2,7 @@
 #include <iostream>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <vector>
 
 #include "vulkan/vulkan.hpp"
@@ -126,10 +127,13 @@ int main()
 
         {
             int32_t* payload = static_cast<int32_t*>(memory.mapMemory(0, memorySize));
-            for (uint32_t k = 1; k < memorySize / sizeof(int32_t); k++)
+            if (!payload)
             {
-                payload[k] = std::rand();
+                BAIL_ON_BAD_RESULT(VK_ERROR_OUT_OF_HOST_MEMORY);
             }
+            auto payloadSpan = std::span<int32_t>(payload, memorySize / sizeof(int32_t));
+            std::ranges::for_each(payloadSpan, [](auto& elem) { elem = std::rand(); });
+            std::ranges::for_each_n(payload, 10, [](const auto& elem) { std::cout << elem << "\n"; });
         }
 
         std::cout << to_string(memory.debugReportObjectType) << "\n";
