@@ -139,6 +139,11 @@ int main()
         std::cout << to_string(memory.debugReportObjectType) << "\n";
 
         memory.unmapMemory();
+
+        const auto bufferCreateInfo =
+            vk::BufferCreateInfo(vk::BufferCreateFlags(), bufferSize, vk::BufferUsageFlagBits::eStorageBuffer,
+                                 vk::SharingMode::eExclusive, 1, &(*queueFamilyIndex));
+        const auto buffer = vk::raii::Buffer(device, bufferCreateInfo);
     }
     return 0;
 }
