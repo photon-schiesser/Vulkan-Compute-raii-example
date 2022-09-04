@@ -139,11 +139,17 @@ int main()
         std::cout << to_string(memory.debugReportObjectType) << "\n";
 
         memory.unmapMemory();
-
+        const std::array indices = {static_cast<uint32_t>(*queueFamilyIndex)};
         const auto bufferCreateInfo =
             vk::BufferCreateInfo(vk::BufferCreateFlags(), bufferSize, vk::BufferUsageFlagBits::eStorageBuffer,
-                                 vk::SharingMode::eExclusive, 1, &(*queueFamilyIndex));
-        const auto buffer = vk::raii::Buffer(device, bufferCreateInfo);
+                                 vk::SharingMode::eExclusive, indices);
+        const auto in_buffer = vk::raii::Buffer(device, bufferCreateInfo);
+
+        const auto out_buffer = vk::raii::Buffer(device, bufferCreateInfo);
+
+        // in_buffer.bindMemory(memory,0);
+
+        // out_buffer.bindMemory(memory,0);
     }
     return 0;
 }
