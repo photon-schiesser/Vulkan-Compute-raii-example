@@ -17,3 +17,4 @@ else()
   target_compile_options(example PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
+target_precompile_headers(example PUBLIC /usr/include/vulkan/vulkan.hpp PUBLIC /usr/include/vulkan/vulkan_raii.hpp)
