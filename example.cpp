@@ -147,9 +147,9 @@ int main()
 
         const auto out_buffer = vk::raii::Buffer(device, bufferCreateInfo);
 
-        // in_buffer.bindMemory(memory,0);
+        in_buffer.bindMemory(*memory, 0);
 
-        // out_buffer.bindMemory(memory,0);
+        out_buffer.bindMemory(*memory, bufferSize);
     }
     return 0;
 }
