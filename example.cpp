@@ -1,3 +1,5 @@
+#include "makeSpirvCode.hpp"
+
 #include <array>
 #include <iostream>
 #include <optional>
@@ -150,6 +152,8 @@ int main()
         in_buffer.bindMemory(*memory, 0);
 
         out_buffer.bindMemory(*memory, bufferSize);
+
+        const auto spirv = makeSpirvCode(static_cast<uint32_t>(bufferSize));
     }
     return 0;
 }

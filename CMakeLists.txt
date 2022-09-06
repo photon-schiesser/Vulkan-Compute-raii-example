@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 find_package(Vulkan REQUIRED)
 
-add_executable(example example.cpp)
+add_executable(example example.cpp makeSpirvCode.cpp)
 
 target_link_libraries(example Vulkan::Vulkan)
 
