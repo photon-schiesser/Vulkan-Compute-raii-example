@@ -153,7 +153,8 @@ int main()
 
         out_buffer.bindMemory(*memory, bufferSize);
 
-        const auto spirv = makeSpirvCode(static_cast<uint32_t>(bufferSize));
+        constexpr auto spirv = makeSpirvCode(static_cast<uint32_t>(bufferSize));
+        (void)spirv;
     }
     return 0;
 }
