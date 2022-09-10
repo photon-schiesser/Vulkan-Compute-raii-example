@@ -153,8 +153,10 @@ int main()
 
         out_buffer.bindMemory(*memory, bufferSize);
 
-        constexpr auto spirv = makeSpirvCode(static_cast<uint32_t>(bufferSize));
-        (void)spirv;
+        auto spirv = makeSpirvCode(static_cast<int32_t>(bufferSize));
+
+        const auto shaderCreateInfo = vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(),spirv);
+        const auto shaderModule = vk::raii::ShaderModule(device,shaderCreateInfo);
     }
     return 0;
 }

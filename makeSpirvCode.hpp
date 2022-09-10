@@ -2,7 +2,7 @@
 
 constexpr auto makeSpirvCode(const u_int32_t bufferLength)
 {
-    enum
+    enum : u_int32_t
     {
         RESERVED_ID = 0,
         FUNC_ID,
@@ -30,7 +30,7 @@ constexpr auto makeSpirvCode(const u_int32_t bufferLength)
         BOUND
     };
 
-    enum
+    enum : u_int32_t
     {
         INPUT = 1,
         UNIFORM = 2,
@@ -84,10 +84,11 @@ constexpr auto makeSpirvCode(const u_int32_t bufferLength)
         0,
 
         // OpEntryPoint GLCompute %FUNC_ID "f" %IN_ID %OUT_ID
-        (4 << 16) | OP_ENTRY_POINT,
+        (5 << 16) | OP_ENTRY_POINT,
         5,
         FUNC_ID,
-        0x00000066,
+        0x66,
+        GLOBAL_INVOCATION_ID,
 
         // OpExecutionMode %FUNC_ID LocalSize 1 1 1
         (6 << 16) | OP_EXECUTION_MODE,
