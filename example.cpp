@@ -157,17 +157,29 @@ int main()
 
         out_buffer.bindMemory(*memory, bufferSize);
 
-        auto spirv = makeSpirvCode(static_cast<int32_t>(bufferSize));
+        const auto spirv = makeSpirvCode(static_cast<int32_t>(bufferSize));
 
         const auto shaderModule = vk::raii::ShaderModule(device, vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), spirv));
 
-        std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {
-            vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute, nullptr), 
+        const std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {
+            vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute, nullptr),
             vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute, nullptr)};
 
-        const auto descriptorSetLayout = vk::raii::DescriptorSetLayout(device, vk::DescriptorSetLayoutCreateInfo(vk::DescriptorSetLayoutCreateFlags(), bindings));
-        (void)descriptorSetLayout;
-        
+        const auto descriptorSetLayout = vk::raii::DescriptorSetLayout(device,
+                                                                       vk::DescriptorSetLayoutCreateInfo(vk::DescriptorSetLayoutCreateFlags(), bindings));
+
+        const auto pipelineLayout = vk::raii::PipelineLayout(device,
+                                                             vk::PipelineLayoutCreateInfo(vk::PipelineLayoutCreateFlags(), *descriptorSetLayout));
+
+        const auto shaderStageCreateInfo = vk::PipelineShaderStageCreateInfo(
+            vk::PipelineShaderStageCreateFlags(), vk::ShaderStageFlagBits::eCompute, *shaderModule, "f", 0);
+        const auto computePipelineCreateInfo = vk::ComputePipelineCreateInfo(vk::PipelineCreateFlags(),
+                                                                             shaderStageCreateInfo, *pipelineLayout);
+        const auto pipeline = vk::raii::Pipeline(device, nullptr, computePipelineCreateInfo);
+
+        const auto descriptorPoolSize = vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 2);
+        const auto createInfo = vk::DescriptorPoolCreateInfo(vk::DescriptorPoolCreateFlags(), 1, 1, &descriptorPoolSize);
+        const auto descriptorPool = vk::raii::DescriptorPool(device,createInfo);
     }
     return 0;
 }
