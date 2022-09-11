@@ -178,8 +178,13 @@ int main()
         const auto pipeline = vk::raii::Pipeline(device, nullptr, computePipelineCreateInfo);
 
         const auto descriptorPoolSize = vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 2);
-        const auto createInfo = vk::DescriptorPoolCreateInfo(vk::DescriptorPoolCreateFlags(), 1, 1, &descriptorPoolSize);
-        const auto descriptorPool = vk::raii::DescriptorPool(device,createInfo);
+        const auto descriptorPoolCreateInfo = vk::DescriptorPoolCreateInfo(vk::DescriptorPoolCreateFlags() | vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 1, 1, &descriptorPoolSize);
+        assert( descriptorPoolCreateInfo.flags & vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet );
+        const auto descriptorPool = vk::raii::DescriptorPool(device,descriptorPoolCreateInfo);
+        const vk::DescriptorSetAllocateInfo descriptorSetAllocateInfo(*descriptorPool, *descriptorSetLayout);
+        vk::raii::DescriptorSets pDescriptorSets(device, descriptorSetAllocateInfo);
+//        vk::WriteDescriptorSet(pDescriptorSets[0],0,0,vk::DescriptorType::eStorageBuffer,
+//        device.updateDescriptorSets();
     }
     return 0;
 }
