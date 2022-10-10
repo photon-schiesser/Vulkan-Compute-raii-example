@@ -1,6 +1,7 @@
 #include "makeSpirvCode.hpp"
 
 #include <array>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <ranges>
@@ -10,57 +11,56 @@
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_raii.hpp"
 
-#define BAIL_ON_BAD_RESULT(result)                                 \
-    if ((result) != VK_SUCCESS)                                    \
-    {                                                              \
-        fprintf(stderr, "Failure at %u %s\n", __LINE__, __FILE__); \
-        exit(-1);                                                  \
+#define BAIL_ON_BAD_RESULT(result)                                                                                     \
+    if ((result) != VK_SUCCESS)                                                                                        \
+    {                                                                                                                  \
+        fprintf(stderr, "Failure at %u %s\n", __LINE__, __FILE__);                                                     \
+        exit(-1);                                                                                                      \
     }
 
 namespace
 {
-    std::pair<VkResult, std::optional<size_t>> getBestComputeQueue(const auto &physicalDevice)
+std::pair<VkResult, std::optional<size_t>> getBestComputeQueue(const auto &physicalDevice)
+{
+    const auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
+
+    // first try and find a queue that has just the compute bit set
+    for (size_t i = 0; const auto &prop : queueFamilyProperties)
     {
-        const auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
+        // mask out the sparse binding bit that we aren't caring about (yet!) and
+        // the transfer bit
+        const auto maskedFlags =
+            (~(vk::QueueFlagBits::eTransfer | vk::QueueFlagBits::eSparseBinding) & prop.queueFlags);
 
-        // first try and find a queue that has just the compute bit set
-        for (size_t i = 0; const auto &prop : queueFamilyProperties)
+        if (!(vk::QueueFlagBits::eGraphics & maskedFlags) && (vk::QueueFlagBits::eCompute & maskedFlags))
         {
-            // mask out the sparse binding bit that we aren't caring about (yet!) and
-            // the transfer bit
-            const auto maskedFlags =
-                (~(vk::QueueFlagBits::eTransfer | vk::QueueFlagBits::eSparseBinding) & prop.queueFlags);
-
-            if (!(vk::QueueFlagBits::eGraphics & maskedFlags) && (vk::QueueFlagBits::eCompute & maskedFlags))
-            {
-                return {VK_SUCCESS, i};
-            }
-            ++i;
+            return {VK_SUCCESS, i};
         }
-
-        // lastly get any queue that'll work for us
-        for (size_t i = 0; const auto &prop : queueFamilyProperties)
-        {
-            // mask out the sparse binding bit that we aren't caring about (yet!) and
-            // the transfer bit
-            const auto maskedFlags =
-                (~(vk::QueueFlagBits::eTransfer | vk::QueueFlagBits::eSparseBinding) & prop.queueFlags);
-
-            if (vk::QueueFlagBits::eCompute & maskedFlags)
-            {
-                return {VK_SUCCESS, i};
-            }
-            ++i;
-        }
-
-        return {VK_ERROR_INITIALIZATION_FAILED, {}};
+        ++i;
     }
+
+    // lastly get any queue that'll work for us
+    for (size_t i = 0; const auto &prop : queueFamilyProperties)
+    {
+        // mask out the sparse binding bit that we aren't caring about (yet!) and
+        // the transfer bit
+        const auto maskedFlags =
+            (~(vk::QueueFlagBits::eTransfer | vk::QueueFlagBits::eSparseBinding) & prop.queueFlags);
+
+        if (vk::QueueFlagBits::eCompute & maskedFlags)
+        {
+            return {VK_SUCCESS, i};
+        }
+        ++i;
+    }
+
+    return {VK_ERROR_INITIALIZATION_FAILED, {}};
+}
 } // namespace
 
 int main()
 {
-    constexpr vk::ApplicationInfo applicationInfo = []()
-    {
+    constexpr vk::ApplicationInfo applicationInfo = []() {
         vk::ApplicationInfo temp;
         temp.pApplicationName = "Compute-Pipeline";
         temp.applicationVersion = 1;
@@ -103,8 +103,7 @@ int main()
 
         const auto memorySize = bufferSize * 2;
 
-        const auto memoryTypeIndex = [&props]() -> std::optional<size_t>
-        {
+        const auto memoryTypeIndex = [&props]() -> std::optional<size_t> {
             for (const auto &k : std::views::iota(0u, props.memoryTypeCount))
             {
                 std::cout << to_string(props.memoryTypes[k].propertyFlags) << "\n";
@@ -136,10 +135,8 @@ int main()
                 BAIL_ON_BAD_RESULT(VK_ERROR_OUT_OF_HOST_MEMORY);
             }
             auto payloadSpan = std::span<int32_t>(payload, memorySize / sizeof(int32_t));
-            std::ranges::for_each(payloadSpan, [](auto &elem)
-                                  { elem = std::rand(); });
-            std::ranges::for_each_n(payload, 10, [](const auto &elem)
-                                    { std::cout << elem << "\n"; });
+            std::ranges::for_each(payloadSpan, [](auto &elem) { elem = std::rand(); });
+            std::ranges::for_each_n(payload, 10, [](const auto &elem) { std::cout << elem << "\n"; });
         }
 
         std::cout << to_string(memory.debugReportObjectType) << "\n";
@@ -158,33 +155,40 @@ int main()
         out_buffer.bindMemory(*memory, bufferSize);
 
         const auto spirv = makeSpirvCode(static_cast<int32_t>(bufferSize));
-
-        const auto shaderModule = vk::raii::ShaderModule(device, vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), spirv));
+        std::ofstream spirvFile("shader.comp.spirv", std::ios::binary);
+        spirvFile.write(reinterpret_cast<const char *>(spirv.data()), sizeof(spirv));
+        spirvFile.close();
+        const auto shaderModule =
+            vk::raii::ShaderModule(device, vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), spirv));
 
         const std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {
-            vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute, nullptr),
-            vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute, nullptr)};
+            vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute,
+                                           nullptr),
+            vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute,
+                                           nullptr)};
 
-        const auto descriptorSetLayout = vk::raii::DescriptorSetLayout(device,
-                                                                       vk::DescriptorSetLayoutCreateInfo(vk::DescriptorSetLayoutCreateFlags(), bindings));
+        const auto descriptorSetLayout = vk::raii::DescriptorSetLayout(
+            device, vk::DescriptorSetLayoutCreateInfo(vk::DescriptorSetLayoutCreateFlags(), bindings));
 
-        const auto pipelineLayout = vk::raii::PipelineLayout(device,
-                                                             vk::PipelineLayoutCreateInfo(vk::PipelineLayoutCreateFlags(), *descriptorSetLayout));
+        const auto pipelineLayout = vk::raii::PipelineLayout(
+            device, vk::PipelineLayoutCreateInfo(vk::PipelineLayoutCreateFlags(), *descriptorSetLayout));
 
         const auto shaderStageCreateInfo = vk::PipelineShaderStageCreateInfo(
             vk::PipelineShaderStageCreateFlags(), vk::ShaderStageFlagBits::eCompute, *shaderModule, "f", 0);
-        const auto computePipelineCreateInfo = vk::ComputePipelineCreateInfo(vk::PipelineCreateFlags(),
-                                                                             shaderStageCreateInfo, *pipelineLayout);
+        const auto computePipelineCreateInfo =
+            vk::ComputePipelineCreateInfo(vk::PipelineCreateFlags(), shaderStageCreateInfo, *pipelineLayout);
         const auto pipeline = vk::raii::Pipeline(device, nullptr, computePipelineCreateInfo);
 
         const auto descriptorPoolSize = vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 2);
-        const auto descriptorPoolCreateInfo = vk::DescriptorPoolCreateInfo(vk::DescriptorPoolCreateFlags() | vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 1, 1, &descriptorPoolSize);
-        assert( descriptorPoolCreateInfo.flags & vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet );
-        const auto descriptorPool = vk::raii::DescriptorPool(device,descriptorPoolCreateInfo);
+        const auto descriptorPoolCreateInfo = vk::DescriptorPoolCreateInfo(
+            vk::DescriptorPoolCreateFlags() | vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 1, 1,
+            &descriptorPoolSize);
+        assert(descriptorPoolCreateInfo.flags & vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
+        const auto descriptorPool = vk::raii::DescriptorPool(device, descriptorPoolCreateInfo);
         const vk::DescriptorSetAllocateInfo descriptorSetAllocateInfo(*descriptorPool, *descriptorSetLayout);
-        vk::raii::DescriptorSets pDescriptorSets(device, descriptorSetAllocateInfo);
-//        vk::WriteDescriptorSet(pDescriptorSets[0],0,0,vk::DescriptorType::eStorageBuffer,
-//        device.updateDescriptorSets();
+        auto descriptorSets = device.allocateDescriptorSets(descriptorSetAllocateInfo);
+        vk::raii::DescriptorSet descriptorSet(std::move(descriptorSets[0]));
+        // auto writeDescriptorSet = vk::WriteDescriptorSet(descriptorSet, 0, 0, 1, vk::DescriptorType::eStorageBuffer);
     }
     return 0;
 }
