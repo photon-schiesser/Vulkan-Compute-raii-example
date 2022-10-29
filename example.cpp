@@ -132,6 +132,7 @@ int main()
 
         const vk::raii::DeviceMemory memory(device, memoryAllocateInfo);
 
+        std::vector<int32_t> copyOfInputData;
         {
             int32_t* payload = static_cast<int32_t*>(memory.mapMemory(0, memorySize));
             if (!payload)
@@ -140,8 +141,18 @@ int main()
             }
             auto payloadSpan = std::span<int32_t>(payload, memorySize / sizeof(int32_t));
             std::ranges::for_each(payloadSpan, [](auto& elem) { elem = std::rand(); });
-            std::ranges::for_each_n(payload, 10,
-                                    [](const auto& elem) { std::cout << elem << "\n"; });
+            /* std::ranges::for_each_n(payload, 10,
+                                    [](const auto& elem) { std::cout << elem << "\n"; }); */
+            const auto inputSpan = std::span(payload, memorySize / sizeof(int32_t) / 2);
+            const auto outputSpan =
+                std::span(inputSpan.data() + inputSpan.size(), inputSpan.size());
+            if (std::ranges::equal(inputSpan, outputSpan))
+            {
+                std::cout << "The memory already had equal values"
+                          << "\n";
+            }
+            copyOfInputData.resize(payloadSpan.size());
+            std::ranges::copy(payloadSpan, copyOfInputData.begin());
         }
 
         std::cout << to_string(memory.debugReportObjectType) << "\n";
@@ -234,6 +245,31 @@ int main()
 
         queue.submit(vk::SubmitInfo(nullptr, nullptr, *commandBuffer));
         queue.waitIdle();
+
+        const auto* payload =
+            static_cast<int32_t*>(memory.mapMemory(0, memorySize, vk::MemoryMapFlags{0}));
+        const auto outputSpan = std::span(payload, copyOfInputData.size());
+
+        assert(memorySize / sizeof(int32_t) == outputSpan.size());
+        const auto frontHalf = std::span(outputSpan.data(), outputSpan.size() / 2);
+        const auto backHalf = std::span(outputSpan.data() + frontHalf.size(), frontHalf.size());
+
+        const auto [p1, p2] = std::ranges::mismatch(frontHalf, backHalf);
+        if (p1 != frontHalf.end())
+        {
+            std::cout << "Bad at " << std::distance(frontHalf.begin(), p1) << "\n";
         }
+        if (p2 != backHalf.end())
+        {
+            std::cout << "Bad at " << std::distance(backHalf.begin(), p2) << "\n";
+        }
+
+        const auto [i1, i2] = std::ranges::mismatch(copyOfInputData, outputSpan);
+        if (i1 != copyOfInputData.end())
+        {
+            std::cout << "Input and Output differ at " << std::distance(copyOfInputData.begin(), i1)
+                      << "/" << copyOfInputData.size() << "\n";
+        }
+    }
     return 0;
 }
