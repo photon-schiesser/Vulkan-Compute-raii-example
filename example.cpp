@@ -229,6 +229,11 @@ int main()
 
         commandBuffer.dispatch(bufferSize / sizeof(int32_t), 1, 1);
         commandBuffer.end();
-    }
+
+        const auto queue = vk::raii::Queue(device, *queueFamilyIndex, 0);
+
+        queue.submit(vk::SubmitInfo(nullptr, nullptr, *commandBuffer));
+        queue.waitIdle();
+        }
     return 0;
 }
