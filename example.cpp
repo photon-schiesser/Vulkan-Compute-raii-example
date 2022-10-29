@@ -200,8 +200,15 @@ int main()
         auto descriptorSets = device.allocateDescriptorSets(descriptorSetAllocateInfo);
 
         vk::raii::DescriptorSet descriptorSet(std::move(descriptorSets[0]));
-        auto writeDescriptorSet =
-            vk::WriteDescriptorSet(*descriptorSet, 0, 0, 1, vk::DescriptorType::eStorageBuffer);
+
+        const auto in_descriptorBufferInfo = vk::DescriptorBufferInfo(*in_buffer, 0, VK_WHOLE_SIZE);
+        const auto out_descriptorBufferInfo =
+            vk::DescriptorBufferInfo(*out_buffer, 0, VK_WHOLE_SIZE);
+        const std::array<vk::WriteDescriptorSet, 2> writeDescriptorSet = {
+            vk::WriteDescriptorSet(*descriptorSet, 0, 0, 1, vk::DescriptorType::eStorageBuffer,
+                                   nullptr, &in_descriptorBufferInfo),
+            vk::WriteDescriptorSet(*descriptorSet, 1, 0, 1, vk::DescriptorType::eStorageBuffer,
+                                   nullptr, &out_descriptorBufferInfo)};
         (void)writeDescriptorSet;
     }
     return 0;
