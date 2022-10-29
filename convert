@@ -572,16 +572,16 @@ int main(int argc, const char * const argv[]) {
     };
 
     BAIL_ON_BAD_RESULT(vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo));
-
+    // done
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-
+    // done
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
       pipelineLayout, 0, 1, &descriptorSet, 0, 0);
 
     vkCmdDispatch(commandBuffer, bufferSize / sizeof(int32_t), 1, 1);
 
     BAIL_ON_BAD_RESULT(vkEndCommandBuffer(commandBuffer));
-
+    // done
     VkQueue queue;
     vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
 

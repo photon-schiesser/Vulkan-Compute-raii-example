@@ -199,7 +199,7 @@ int main()
                                                                       *descriptorSetLayout);
         auto descriptorSets = device.allocateDescriptorSets(descriptorSetAllocateInfo);
 
-        vk::raii::DescriptorSet descriptorSet(std::move(descriptorSets[0]));
+        const auto& descriptorSet = descriptorSets[0];
 
         const auto in_descriptorBufferInfo = vk::DescriptorBufferInfo(*in_buffer, 0, VK_WHOLE_SIZE);
         const auto out_descriptorBufferInfo =
@@ -221,7 +221,14 @@ int main()
         const auto commandBufferBeginInfo =
             vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 
-        commandBuffers.front().begin(commandBufferBeginInfo);
+        const auto& commandBuffer = commandBuffers.front();
+        commandBuffer.begin(commandBufferBeginInfo);
+        commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, *pipeline);
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *pipelineLayout, 0,
+                                         *descriptorSet, nullptr);
+
+        commandBuffer.dispatch(bufferSize / sizeof(int32_t), 1, 1);
+        commandBuffer.end();
     }
     return 0;
 }
