@@ -209,7 +209,19 @@ int main()
                                    nullptr, &in_descriptorBufferInfo),
             vk::WriteDescriptorSet(*descriptorSet, 1, 0, 1, vk::DescriptorType::eStorageBuffer,
                                    nullptr, &out_descriptorBufferInfo)};
-        (void)writeDescriptorSet;
+        device.updateDescriptorSets(writeDescriptorSet, {});
+
+        const auto commandPool = vk::raii::CommandPool(
+            device, vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlags(), *queueFamilyIndex));
+
+        const auto commandBuffers = vk::raii::CommandBuffers(
+            device,
+            vk::CommandBufferAllocateInfo(*commandPool, vk::CommandBufferLevel::ePrimary, 1));
+
+        const auto commandBufferBeginInfo =
+            vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+
+        commandBuffers.front().begin(commandBufferBeginInfo);
     }
     return 0;
 }
