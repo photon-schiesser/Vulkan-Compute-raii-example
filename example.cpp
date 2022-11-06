@@ -72,9 +72,9 @@ int main()
         return temp;
     }();
 
-    const std::vector<const char*> Layers = {"VK_LAYER_KHRONOS_validation"};
-    const vk::InstanceCreateInfo instanceCreateInfo(vk::InstanceCreateFlags(), &applicationInfo, Layers.size(),
-                                                    Layers.data());
+    constexpr std::array layers = {"VK_LAYER_KHRONOS_validation"};
+    const vk::InstanceCreateInfo instanceCreateInfo(vk::InstanceCreateFlags(), &applicationInfo, layers.size(),
+                                                    layers.data());
 
     const vk::raii::Context context;
     const auto instance = vk::raii::Instance(context, instanceCreateInfo);
