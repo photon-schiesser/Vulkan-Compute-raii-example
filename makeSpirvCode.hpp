@@ -1,4 +1,4 @@
-#include <vector>
+#include <array>
 
 constexpr auto makeSpirvCode(const u_int32_t bufferLength)
 {
