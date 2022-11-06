@@ -21,13 +21,15 @@
 
 namespace
 {
-std::pair<VkResult, std::optional<size_t>> getBestComputeQueue(const auto& physicalDevice)
+std::pair<VkResult, std::optional<uint32_t>> getBestComputeQueue(const auto& physicalDevice)
 {
     const auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
-
+    using queueIndex_t = uint32_t;
     // first try and find a queue that has just the compute bit set
-    for (size_t i = 0; const auto& prop : queueFamilyProperties)
+    const auto queueIndices = std::views::iota(queueIndex_t(0), queueIndex_t(queueFamilyProperties.size()));
+    for (const auto queueIndex : queueIndices)
     {
+        const auto& prop = queueFamilyProperties[queueIndex];
         // mask out the sparse binding bit that we aren't caring about (yet!) and
         // the transfer bit
         const auto maskedFlags =
@@ -35,14 +37,14 @@ std::pair<VkResult, std::optional<size_t>> getBestComputeQueue(const auto& physi
 
         if (!(vk::QueueFlagBits::eGraphics & maskedFlags) && (vk::QueueFlagBits::eCompute & maskedFlags))
         {
-            return {VK_SUCCESS, i};
+            return {VK_SUCCESS, queueIndex};
         }
-        ++i;
     }
 
     // lastly get any queue that'll work for us
-    for (size_t i = 0; const auto& prop : queueFamilyProperties)
+    for (const auto queueIndex : queueIndices)
     {
+        const auto& prop = queueFamilyProperties[queueIndex];
         // mask out the sparse binding bit that we aren't caring about (yet!) and
         // the transfer bit
         const auto maskedFlags =
@@ -50,9 +52,8 @@ std::pair<VkResult, std::optional<size_t>> getBestComputeQueue(const auto& physi
 
         if (vk::QueueFlagBits::eCompute & maskedFlags)
         {
-            return {VK_SUCCESS, i};
+            return {VK_SUCCESS, queueIndex};
         }
-        ++i;
     }
 
     return {VK_ERROR_INITIALIZATION_FAILED, {}};
@@ -160,7 +161,7 @@ int main()
         std::cout << to_string(memory.debugReportObjectType) << "\n";
 
         memory.unmapMemory();
-        const std::array indices = {static_cast<uint32_t>(*queueFamilyIndex)};
+        const std::array indices = {*queueFamilyIndex};
         const auto bufferCreateInfo =
             vk::BufferCreateInfo(vk::BufferCreateFlags(), bufferSize, vk::BufferUsageFlagBits::eStorageBuffer,
                                  vk::SharingMode::eExclusive, indices);
@@ -237,7 +238,7 @@ int main()
         const auto* payload = static_cast<int32_t*>(memory.mapMemory(0, memorySize, vk::MemoryMapFlags{0}));
         const auto outputSpan = std::span(payload, copyOfInputData.size());
 
-        assert(memorySize / sizeof(int32_t) == outputSpan.size());
+        assert(memorySize / sizeof(*payload) == outputSpan.size());
         const auto frontHalf = outputSpan.subspan(0, outputSpan.size() / 2);
         const auto backHalf = outputSpan.subspan(frontHalf.size(), frontHalf.size());
 
