@@ -83,9 +83,12 @@ int main()
     constexpr auto spirv = makeSpirvCode(bufferSize);
     constexpr auto memorySize = bufferSize * 2;
 
-    std::ofstream spirvFile("shader.comp.spirv", std::ios::binary);
-    spirvFile.write(reinterpret_cast<const char*>(spirv.data()), sizeof(spirv));
-    spirvFile.close();
+    // write the spirv to a file just to look at it. Feel free to comment this block out.
+    {
+        std::ofstream spirvFile("shader.comp.spirv", std::ios::binary);
+        spirvFile.write(reinterpret_cast<const char*>(spirv.data()), sizeof(spirv));
+        spirvFile.close();
+    }
 
     const auto physicalDevices = instance.enumeratePhysicalDevices();
     for (const auto& physDev : physicalDevices)
