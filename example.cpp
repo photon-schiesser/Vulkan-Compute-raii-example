@@ -79,7 +79,7 @@ int main()
     const auto instance = vk::raii::Instance(context, instanceCreateInfo);
 
     constexpr uint32_t bufferLength = 16384 * 2;
-    constexpr uint32_t bufferSize = sizeof(bufferLength) * bufferLength;
+    constexpr uint32_t bufferSize = sizeof(int32_t) * bufferLength;
     constexpr auto spirv = makeSpirvCode(bufferSize);
     constexpr auto memorySize = bufferSize * 2;
 
@@ -137,17 +137,17 @@ int main()
 
         std::vector<int32_t> copyOfInputData;
         {
-            int32_t* payload = static_cast<int32_t*>(memory.mapMemory(0, memorySize));
+            auto* payload = static_cast<int32_t*>(memory.mapMemory(0, memorySize));
             if (!payload)
             {
                 BAIL_ON_BAD_RESULT(VK_ERROR_OUT_OF_HOST_MEMORY);
             }
-            auto payloadSpan = std::span<int32_t>(payload, memorySize / sizeof(int32_t));
+            auto payloadSpan = std::span(payload, memorySize / sizeof(*payload));
             std::ranges::for_each(payloadSpan, [](auto& elem) { elem = std::rand(); });
             /* std::ranges::for_each_n(payload, 10,
                                     [](const auto& elem) { std::cout << elem << "\n"; }); */
-            const auto inputSpan = std::span(payload, memorySize / sizeof(int32_t) / 2);
-            const auto outputSpan = std::span(inputSpan.data() + inputSpan.size(), inputSpan.size());
+            const auto inputSpan = payloadSpan.subspan(0, payloadSpan.size() / 2);
+            const auto outputSpan = payloadSpan.subspan(inputSpan.size(), inputSpan.size());
             if (std::ranges::equal(inputSpan, outputSpan))
             {
                 std::cout << "The memory already had equal values"
@@ -238,8 +238,8 @@ int main()
         const auto outputSpan = std::span(payload, copyOfInputData.size());
 
         assert(memorySize / sizeof(int32_t) == outputSpan.size());
-        const auto frontHalf = std::span(outputSpan.data(), outputSpan.size() / 2);
-        const auto backHalf = std::span(outputSpan.data() + frontHalf.size(), frontHalf.size());
+        const auto frontHalf = outputSpan.subspan(0, outputSpan.size() / 2);
+        const auto backHalf = outputSpan.subspan(frontHalf.size(), frontHalf.size());
 
         const auto [p1, p2] = std::ranges::mismatch(frontHalf, backHalf);
         if (p1 != frontHalf.end())
