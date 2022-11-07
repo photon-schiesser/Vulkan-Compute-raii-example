@@ -214,23 +214,25 @@ int main()
 
         const auto in_descriptorBufferInfo = vk::DescriptorBufferInfo(*in_buffer, 0, VK_WHOLE_SIZE);
         const auto out_descriptorBufferInfo = vk::DescriptorBufferInfo(*out_buffer, 0, VK_WHOLE_SIZE);
+
+        constexpr auto inBindingIndex = 0;
+        constexpr auto outBindingIndex = 1;
         const std::array writeDescriptorSet = {
-            vk::WriteDescriptorSet(*descriptorSet, 0, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr,
+            vk::WriteDescriptorSet(*descriptorSet, inBindingIndex, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr,
                                    &in_descriptorBufferInfo),
-            vk::WriteDescriptorSet(*descriptorSet, 1, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr,
+            vk::WriteDescriptorSet(*descriptorSet, outBindingIndex, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr,
                                    &out_descriptorBufferInfo)};
         device.updateDescriptorSets(writeDescriptorSet, {});
 
         const auto commandPool =
             vk::raii::CommandPool(device, vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlags(), *queueFamilyIndex));
 
+        constexpr auto commandBuffersCount = 1;
         const auto commandBuffers = vk::raii::CommandBuffers(
-            device, vk::CommandBufferAllocateInfo(*commandPool, vk::CommandBufferLevel::ePrimary, 1));
-
-        const auto commandBufferBeginInfo = vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+            device, vk::CommandBufferAllocateInfo(*commandPool, vk::CommandBufferLevel::ePrimary, commandBuffersCount));
 
         const auto& commandBuffer = commandBuffers.front();
-        commandBuffer.begin(commandBufferBeginInfo);
+        commandBuffer.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
         commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, *pipeline);
         commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *pipelineLayout, 0, *descriptorSet, nullptr);
 
