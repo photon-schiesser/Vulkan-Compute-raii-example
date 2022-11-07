@@ -161,17 +161,6 @@ int main()
         std::cout << to_string(memory.debugReportObjectType) << "\n";
 
         memory.unmapMemory();
-        const std::array indices = {*queueFamilyIndex};
-        const auto bufferCreateInfo =
-            vk::BufferCreateInfo(vk::BufferCreateFlags(), bufferSize, vk::BufferUsageFlagBits::eStorageBuffer,
-                                 vk::SharingMode::eExclusive, indices);
-        const auto in_buffer = vk::raii::Buffer(device, bufferCreateInfo);
-
-        const auto out_buffer = vk::raii::Buffer(device, bufferCreateInfo);
-
-        in_buffer.bindMemory(*memory, 0);
-
-        out_buffer.bindMemory(*memory, bufferSize);
 
         constexpr std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute,
@@ -211,6 +200,19 @@ int main()
         const auto descriptorSets = device.allocateDescriptorSets(descriptorSetAllocateInfo);
         assert(descriptorSets.size() == 1);
         const auto& descriptorSet = descriptorSets[0];
+
+        // Create in/out buffers with descriptors and bind to memory
+        const std::array indices = {*queueFamilyIndex};
+        const auto bufferCreateInfo =
+            vk::BufferCreateInfo(vk::BufferCreateFlags(), bufferSize, vk::BufferUsageFlagBits::eStorageBuffer,
+                                 vk::SharingMode::eExclusive, indices);
+        const auto in_buffer = vk::raii::Buffer(device, bufferCreateInfo);
+
+        const auto out_buffer = vk::raii::Buffer(device, bufferCreateInfo);
+
+        in_buffer.bindMemory(*memory, 0);
+
+        out_buffer.bindMemory(*memory, bufferSize);
 
         const auto in_descriptorBufferInfo = vk::DescriptorBufferInfo(*in_buffer, 0, VK_WHOLE_SIZE);
         const auto out_descriptorBufferInfo = vk::DescriptorBufferInfo(*out_buffer, 0, VK_WHOLE_SIZE);
