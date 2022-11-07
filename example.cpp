@@ -214,7 +214,7 @@ int main()
 
         const auto in_descriptorBufferInfo = vk::DescriptorBufferInfo(*in_buffer, 0, VK_WHOLE_SIZE);
         const auto out_descriptorBufferInfo = vk::DescriptorBufferInfo(*out_buffer, 0, VK_WHOLE_SIZE);
-        const std::array<vk::WriteDescriptorSet, 2> writeDescriptorSet = {
+        const std::array writeDescriptorSet = {
             vk::WriteDescriptorSet(*descriptorSet, 0, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr,
                                    &in_descriptorBufferInfo),
             vk::WriteDescriptorSet(*descriptorSet, 1, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr,
