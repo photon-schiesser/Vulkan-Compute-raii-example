@@ -239,7 +239,8 @@ int main()
         commandBuffer.dispatch(bufferLength, 1, 1);
         commandBuffer.end();
 
-        const auto queue = vk::raii::Queue(device, *queueFamilyIndex, 0);
+        constexpr auto queueIndex = 0;
+        const auto queue = vk::raii::Queue(device, *queueFamilyIndex, queueIndex);
 
         queue.submit(vk::SubmitInfo(nullptr, nullptr, *commandBuffer));
         queue.waitIdle();
