@@ -130,7 +130,7 @@ int main()
             BAIL_ON_BAD_RESULT(VK_ERROR_OUT_OF_HOST_MEMORY);
         }
 
-        std::cout << *memoryTypeIndex << "\n";
+        std::cout << "Memory type index: " << *memoryTypeIndex << "\n";
 
         const vk::MemoryAllocateInfo memoryAllocateInfo(memorySize, *memoryTypeIndex);
 
@@ -184,7 +184,7 @@ int main()
             vk::ComputePipelineCreateInfo(vk::PipelineCreateFlags(), shaderStageCreateInfo, *pipelineLayout);
 
         const auto pipeline = vk::raii::Pipeline(device, nullptr, computePipelineCreateInfo);
-        
+
         constexpr auto DescriptorCount = 2;
         constexpr auto descriptorPoolSize = vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, DescriptorCount);
         constexpr std::array descriptorPoolSizeArray = {descriptorPoolSize};
