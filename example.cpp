@@ -195,12 +195,12 @@ int main()
             vk::ComputePipelineCreateInfo(vk::PipelineCreateFlags(), shaderStageCreateInfo, *pipelineLayout);
 
         const auto pipeline = vk::raii::Pipeline(device, nullptr, computePipelineCreateInfo);
-
-        const auto descriptorPoolSize = vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 2);
-
+        
+        constexpr auto DescriptorCount = 2;
+        constexpr auto descriptorPoolSize = vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, DescriptorCount);
+        constexpr std::array descriptorPoolSizeArray = {descriptorPoolSize};
         const auto descriptorPoolCreateInfo = vk::DescriptorPoolCreateInfo(
-            vk::DescriptorPoolCreateFlags() | vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 1, 1,
-            &descriptorPoolSize);
+            vk::DescriptorPoolCreateFlags() | vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 1, descriptorPoolSizeArray);
 
         assert(descriptorPoolCreateInfo.flags & vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
 
