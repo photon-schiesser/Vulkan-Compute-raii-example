@@ -115,9 +115,10 @@ int main()
 
     const vk::raii::Context context;
     const auto instance = vk::raii::Instance(context, instanceCreateInfo);
-
-    constexpr uint32_t bufferLength = 16384 * 2 * 32;
-    constexpr uint32_t bufferSize = sizeof(int32_t) * bufferLength;
+    constexpr auto localGroupSize = 128; 
+    constexpr uint32_t bufferLength = 16384 * 2 * 16;
+    using bufferData_t = int32_t;
+    constexpr uint32_t bufferSize = sizeof(bufferData_t) * bufferLength;
     constexpr auto memorySize = bufferSize * 2;
 
     const auto spirvFromFile = getSpirvFromFile("copy.comp.spv");
@@ -169,9 +170,9 @@ int main()
 
         const vk::raii::DeviceMemory memory(device, memoryAllocateInfo);
 
-        std::vector<int32_t> copyOfInputData;
+        std::vector<bufferData_t> copyOfInputData;
         {
-            auto* payload = static_cast<int32_t*>(memory.mapMemory(0, memorySize));
+            auto* payload = static_cast<bufferData_t*>(memory.mapMemory(0, memorySize));
             if (!payload)
             {
                 BAIL_ON_BAD_RESULT(VK_ERROR_OUT_OF_HOST_MEMORY);
@@ -284,7 +285,7 @@ int main()
         commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *pipelineLayout, 0,
                                          *descriptorSet, nullptr);
 
-        commandBuffer.dispatch(bufferLength/32, 1, 1);
+        commandBuffer.dispatch(bufferLength/localGroupSize, 1, 1);
         commandBuffer.end();
 
         constexpr auto queueIndex = 0;
@@ -294,7 +295,7 @@ int main()
         queue.waitIdle();
 
         const auto* payload =
-            static_cast<int32_t*>(memory.mapMemory(0, memorySize, vk::MemoryMapFlags{0}));
+            static_cast<bufferData_t*>(memory.mapMemory(0, memorySize, vk::MemoryMapFlags{0}));
         const auto outputSpan = std::span(payload, copyOfInputData.size());
 
         assert(memorySize / sizeof(*payload) == outputSpan.size());
