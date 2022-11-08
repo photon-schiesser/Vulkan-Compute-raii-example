@@ -67,8 +67,9 @@ inline auto div_up(uint32_t x, uint32_t y)
 
 auto getSpirvFromFile(const std::string_view filePath)
 {
-    std::vector<uint32_t> spirvFromFile;
-    std::vector<char> spvBuffer;
+    using spirv_t = uint32_t;
+    using file_t = char;
+    std::vector<file_t> spvBuffer;
     {
         std::ifstream spirvFile(filePath.data(), std::ios::binary | std::ios::ate);
         std::streamsize size = spirvFile.tellg();
@@ -85,9 +86,13 @@ auto getSpirvFromFile(const std::string_view filePath)
         }
         spirvFile.close();
     }
-    spvBuffer.resize(4 * div_up(spvBuffer.size(), 4));
-    spirvFromFile.resize(spvBuffer.size() * sizeof(char) / sizeof(uint32_t));
-    const auto start = reinterpret_cast<uint32_t*>(spvBuffer.data());
+    std::vector<spirv_t> spirvFromFile;
+    constexpr auto sizeDivisor = sizeof(spirv_t) / sizeof(file_t);
+    static_assert(sizeDivisor != 0);
+    
+    spvBuffer.resize(sizeDivisor * div_up(spvBuffer.size(), sizeDivisor));
+    spirvFromFile.resize(spvBuffer.size() / sizeDivisor);
+    const auto start = reinterpret_cast<spirv_t*>(spvBuffer.data());
     std::copy(start, start + spirvFromFile.size(), spirvFromFile.data());
     return spirvFromFile;
 }
