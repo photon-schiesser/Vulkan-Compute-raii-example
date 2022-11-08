@@ -6,17 +6,17 @@
 
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
-layout(binding = 0, std430) buffer _9_2
+layout(binding = 0, std430) buffer lay0
 {
-    int _m0[];
-} _2;
+    int m_array[];
+} inBuf;
 
-layout(binding = 1, std430) buffer _9_3
+layout(binding = 1, std430) buffer lay1
 {
-    int _m0[];
-} _3;
+    int m_array[];
+} outBuf;
 
 void main()
 {
-    _3._m0[int(gl_GlobalInvocationID.x)] = _2._m0[int(gl_GlobalInvocationID.x)];
+    outBuf.m_array[int(gl_GlobalInvocationID.x)] = inBuf.m_array[int(gl_GlobalInvocationID.x)];
 }
