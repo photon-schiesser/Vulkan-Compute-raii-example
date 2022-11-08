@@ -89,7 +89,7 @@ auto getSpirvFromFile(const std::string_view filePath)
     std::vector<spirv_t> spirvFromFile;
     constexpr auto sizeDivisor = sizeof(spirv_t) / sizeof(file_t);
     static_assert(sizeDivisor != 0);
-    
+
     spvBuffer.resize(sizeDivisor * div_up(spvBuffer.size(), sizeDivisor));
     spirvFromFile.resize(spvBuffer.size() / sizeDivisor);
     const auto start = reinterpret_cast<spirv_t*>(spvBuffer.data());
@@ -116,7 +116,7 @@ int main()
     const vk::raii::Context context;
     const auto instance = vk::raii::Instance(context, instanceCreateInfo);
 
-    constexpr uint32_t bufferLength = 16384 * 2;
+    constexpr uint32_t bufferLength = 16384 * 2 * 32;
     constexpr uint32_t bufferSize = sizeof(int32_t) * bufferLength;
     constexpr auto memorySize = bufferSize * 2;
 
@@ -284,7 +284,7 @@ int main()
         commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *pipelineLayout, 0,
                                          *descriptorSet, nullptr);
 
-        commandBuffer.dispatch(bufferLength, 1, 1);
+        commandBuffer.dispatch(bufferLength/32, 1, 1);
         commandBuffer.end();
 
         constexpr auto queueIndex = 0;
