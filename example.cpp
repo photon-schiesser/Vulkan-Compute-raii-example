@@ -5,6 +5,7 @@
 #include <ranges>
 #include <span>
 #include <vector>
+#include <chrono>
 
 #define VULKAN_HPP_NO_SMART_HANDLE
 #include "vulkan/vulkan.hpp"
@@ -97,7 +98,7 @@ auto getSpirvFromFile(const std::string_view filePath)
     return spirvFromFile;
 }
 
-int main()
+int copyTest()
 {
     constexpr vk::ApplicationInfo applicationInfo = []() {
         vk::ApplicationInfo temp;
@@ -115,8 +116,8 @@ int main()
 
     const vk::raii::Context context;
     const auto instance = vk::raii::Instance(context, instanceCreateInfo);
-    constexpr auto localGroupSize = 128; 
-    constexpr uint32_t bufferLength = 16384 * 2 * 16;
+    constexpr auto localGroupSize = 256;
+    constexpr uint32_t bufferLength = 16384 * 2 * 16 * 2;
     using bufferData_t = int32_t;
     constexpr uint32_t bufferSize = sizeof(bufferData_t) * bufferLength;
     constexpr auto memorySize = bufferSize * 2;
@@ -124,7 +125,8 @@ int main()
     const auto spirvFromFile = getSpirvFromFile("copy.comp.spv");
 
     const auto physicalDevices = instance.enumeratePhysicalDevices();
-    for (const auto& physDev : physicalDevices)
+
+    for (const auto& physDev : physicalDevices | std::views::take(1))
     {
         const auto [result, queueFamilyIndex] = getBestComputeQueue(physDev);
         if (!queueFamilyIndex)
@@ -280,19 +282,22 @@ int main()
 
         const auto& commandBuffer = commandBuffers.front();
         commandBuffer.begin(
-            vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+            vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eRenderPassContinue));
         commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, *pipeline);
         commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *pipelineLayout, 0,
                                          *descriptorSet, nullptr);
 
-        commandBuffer.dispatch(bufferLength/localGroupSize, 1, 1);
+        commandBuffer.dispatch(bufferLength / localGroupSize, 1, 1);
         commandBuffer.end();
 
         constexpr auto queueIndex = 0;
         const auto queue = vk::raii::Queue(device, *queueFamilyIndex, queueIndex);
 
-        queue.submit(vk::SubmitInfo(nullptr, nullptr, *commandBuffer));
-        queue.waitIdle();
+        std::ranges::for_each(std::views::iota(1, 2000),[&](auto)
+        {
+            queue.submit(vk::SubmitInfo(nullptr, nullptr, *commandBuffer));
+            queue.waitIdle();
+        });
 
         const auto* payload =
             static_cast<bufferData_t*>(memory.mapMemory(0, memorySize, vk::MemoryMapFlags{0}));
@@ -319,5 +324,16 @@ int main()
                       << "/" << copyOfInputData.size() << "\n";
         }
     }
+    return 0;
+}
+
+int main()
+{
+    auto clock = std::chrono::high_resolution_clock();
+    const auto start = clock.now();
+    copyTest();
+    const auto stop = clock.now();
+
+    std::cout << "Duration: " << std::chrono::duration<double,std::milli>(stop-start).count() << "\n";
     return 0;
 }
