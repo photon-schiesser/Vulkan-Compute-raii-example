@@ -293,11 +293,13 @@ int copyTest()
         constexpr auto queueIndex = 0;
         const auto queue = vk::raii::Queue(device, *queueFamilyIndex, queueIndex);
 
-        std::ranges::for_each(std::views::iota(1, 2000),[&](auto)
-        {
+        std::ranges::for_each(std::views::iota(1, 2), [&](auto) {
             queue.submit(vk::SubmitInfo(nullptr, nullptr, *commandBuffer));
             queue.waitIdle();
         });
+        const auto subGroupProps = vk::PhysicalDeviceSubgroupProperties();
+
+        std::cout << "Subgroup Size: " << subGroupProps.subgroupSize << "\n";
 
         const auto* payload =
             static_cast<bufferData_t*>(memory.mapMemory(0, memorySize, vk::MemoryMapFlags{0}));
