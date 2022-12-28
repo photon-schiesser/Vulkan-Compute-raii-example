@@ -116,7 +116,7 @@ int copyTest()
 
     const vk::raii::Context context;
     const auto instance = vk::raii::Instance(context, instanceCreateInfo);
-    constexpr auto localGroupSize = 256;
+    
     constexpr uint32_t bufferLength = 16384 * 2 * 16 * 2;
     using bufferData_t = int32_t;
     constexpr uint32_t bufferSize = sizeof(bufferData_t) * bufferLength;
@@ -130,23 +130,21 @@ int copyTest()
     {
         vk::StructureChain<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceSubgroupProperties>
             chain;
-
-        auto subGroupProps = vk::PhysicalDeviceSubgroupProperties();
-
+        
         [[maybe_unused]] const auto props2 =
             physDev.getProperties2<vk::PhysicalDeviceProperties2,
                                    vk::PhysicalDeviceSubgroupProperties>();
-        subGroupProps = props2.get<vk::PhysicalDeviceSubgroupProperties>();
+        const auto subGroupProps = props2.get<vk::PhysicalDeviceSubgroupProperties>();
 
         std::cout << "Subgroup Size: " << subGroupProps.subgroupSize << "\n";
-
+        const auto localGroupSize = subGroupProps.subgroupSize;
         const auto [result, queueFamilyIndex] = getBestComputeQueue(physDev);
         if (!queueFamilyIndex)
         {
             BAIL_ON_BAD_RESULT(result);
             exit(1);
         }
-
+        
         constexpr std::array queuePrioritory = {1.0f};
         const auto deviceQueueCreateInfo = vk::DeviceQueueCreateInfo(
             vk::DeviceQueueCreateFlags(), *queueFamilyIndex, queuePrioritory);
@@ -227,9 +225,11 @@ int copyTest()
         const auto shaderModule = vk::raii::ShaderModule(
             device, vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), spirvFromFile));
 
+        const auto specializationEntry = vk::SpecializationMapEntry({.constantID=0,.offset=0,.size=sizeof(subGroupProps.subgroupSize)});
+        const auto specializationInfo = vk::SpecializationInfo(1,&specializationEntry,sizeof(subGroupProps.subgroupSize),&subGroupProps.subgroupSize);
         const auto shaderStageCreateInfo = vk::PipelineShaderStageCreateInfo(
             vk::PipelineShaderStageCreateFlags(), vk::ShaderStageFlagBits::eCompute, *shaderModule,
-            "main");
+            "main",&specializationInfo);
 
         const auto computePipelineCreateInfo = vk::ComputePipelineCreateInfo(
             vk::PipelineCreateFlags(), shaderStageCreateInfo, *pipelineLayout);
