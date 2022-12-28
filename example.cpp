@@ -1,11 +1,11 @@
 #include <array>
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <optional>
 #include <ranges>
 #include <span>
 #include <vector>
-#include <chrono>
 
 #define VULKAN_HPP_NO_SMART_HANDLE
 #include "vulkan/vulkan.hpp"
@@ -106,7 +106,7 @@ int copyTest()
         temp.applicationVersion = 1;
         temp.pEngineName = nullptr;
         temp.engineVersion = 0;
-        temp.apiVersion = VK_MAKE_VERSION(1, 0, 9);
+        temp.apiVersion = VK_MAKE_VERSION(1, 1, 0);
         return temp;
     }();
 
@@ -126,8 +126,20 @@ int copyTest()
 
     const auto physicalDevices = instance.enumeratePhysicalDevices();
 
-    for (const auto& physDev : physicalDevices | std::views::take(1))
+    for (const auto& physDev : physicalDevices)
     {
+        vk::StructureChain<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceSubgroupProperties>
+            chain;
+
+        auto subGroupProps = vk::PhysicalDeviceSubgroupProperties();
+
+        [[maybe_unused]] const auto props2 =
+            physDev.getProperties2<vk::PhysicalDeviceProperties2,
+                                   vk::PhysicalDeviceSubgroupProperties>();
+        subGroupProps = props2.get<vk::PhysicalDeviceSubgroupProperties>();
+
+        std::cout << "Subgroup Size: " << subGroupProps.subgroupSize << "\n";
+
         const auto [result, queueFamilyIndex] = getBestComputeQueue(physDev);
         if (!queueFamilyIndex)
         {
@@ -297,9 +309,6 @@ int copyTest()
             queue.submit(vk::SubmitInfo(nullptr, nullptr, *commandBuffer));
             queue.waitIdle();
         });
-        const auto subGroupProps = vk::PhysicalDeviceSubgroupProperties();
-
-        std::cout << "Subgroup Size: " << subGroupProps.subgroupSize << "\n";
 
         const auto* payload =
             static_cast<bufferData_t*>(memory.mapMemory(0, memorySize, vk::MemoryMapFlags{0}));
@@ -336,6 +345,7 @@ int main()
     copyTest();
     const auto stop = clock.now();
 
-    std::cout << "Duration: " << std::chrono::duration<double,std::milli>(stop-start).count() << "\n";
+    std::cout << "Duration: " << std::chrono::duration<double, std::milli>(stop - start).count()
+              << "\n";
     return 0;
 }
