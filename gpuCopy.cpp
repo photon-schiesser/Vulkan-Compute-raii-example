@@ -1,6 +1,7 @@
 #include "gpuCopy.h"
 
 #include <array>
+#include <expected>
 #include <fstream>
 #include <iostream>
 #include <optional>
@@ -21,7 +22,7 @@ constexpr void BAIL_ON_BAD_RESULT(auto result,
 
 namespace
 {
-std::pair<VkResult, std::optional<uint32_t>> getBestComputeQueue(const auto& physicalDevice)
+std::expected<uint32_t, VkResult> getBestComputeQueue(const auto& physicalDevice)
 {
     const auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
     using queueIndex_t = uint32_t;
@@ -39,7 +40,7 @@ std::pair<VkResult, std::optional<uint32_t>> getBestComputeQueue(const auto& phy
         if (!(vk::QueueFlagBits::eGraphics & maskedFlags) &&
             (vk::QueueFlagBits::eCompute & maskedFlags))
         {
-            return {VK_SUCCESS, queueIndex};
+            return queueIndex;
         }
     }
 
@@ -54,11 +55,11 @@ std::pair<VkResult, std::optional<uint32_t>> getBestComputeQueue(const auto& phy
 
         if (vk::QueueFlagBits::eCompute & maskedFlags)
         {
-            return {VK_SUCCESS, queueIndex};
+            return queueIndex;
         }
     }
 
-    return {VK_ERROR_INITIALIZATION_FAILED, {}};
+    return std::unexpected{VK_ERROR_INITIALIZATION_FAILED};
 }
 
 auto div_up(uint32_t x, uint32_t y)
@@ -71,7 +72,7 @@ size_t nextPowerOf2(size_t n)
     size_t v = 1;
     while (v < n)
     {
-        v*=2;
+        v *= 2;
     }
     return v;
 }
@@ -131,11 +132,10 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
 
     std::cout << "Local Group Size used: " << localGroupSize << "\n";
 
-    const auto [result, queueFamilyIndex] = getBestComputeQueue(physDev);
+    const auto queueFamilyIndex = getBestComputeQueue(physDev);
     if (!queueFamilyIndex)
     {
-        BAIL_ON_BAD_RESULT(result);
-        exit(1);
+        BAIL_ON_BAD_RESULT(queueFamilyIndex.error());
     }
 
     constexpr std::array queuePrioritory = {1.0f};
