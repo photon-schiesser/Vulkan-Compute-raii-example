@@ -66,6 +66,16 @@ auto div_up(uint32_t x, uint32_t y)
     return (x + y - 1u) / y;
 }
 
+size_t nextPowerOf2(size_t n)
+{
+    size_t v = 1;
+    while (v < n)
+    {
+        v*=2;
+    }
+    return v;
+}
+
 auto getSpirvFromFile(const std::string_view filePath)
 {
     using spirv_t = uint32_t;
@@ -117,9 +127,9 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
     const auto subgroupMultiplier =
         subGroupProps.subgroupSize * maxWorkGroupCountX > bufferLength
             ? 1
-            : bufferLength / (maxWorkGroupCountX * subGroupProps.subgroupSize) * 2;
+            : nextPowerOf2(bufferLength / (maxWorkGroupCountX * subGroupProps.subgroupSize) + 1);
 
-    const auto localGroupSize = subGroupProps.subgroupSize * subgroupMultiplier;
+    const uint32_t localGroupSize = subGroupProps.subgroupSize * subgroupMultiplier;
 
     std::cout << "Local Group Size used: " << localGroupSize << "\n";
 
