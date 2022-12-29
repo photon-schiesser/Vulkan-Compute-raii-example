@@ -92,10 +92,8 @@ auto getSpirvFromFile(const std::string_view filePath)
         {
             std::cout << "Could not read spv file"
                       << "\n";
-            spirvFile.close();
             exit(1);
         }
-        spirvFile.close();
     }
     std::vector<spirv_t> spirvFromFile;
     constexpr auto sizeDivisor = sizeof(spirv_t) / sizeof(file_t);
