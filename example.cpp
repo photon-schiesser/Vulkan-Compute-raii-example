@@ -145,7 +145,10 @@ int copyTest()
             subGroupProps.subgroupSize * maxWorkGroupCountX > bufferLength
                 ? 1
                 : bufferLength / (maxWorkGroupCountX * subGroupProps.subgroupSize)*2;
+
         const auto localGroupSize = subGroupProps.subgroupSize * subgroupMultiplier;
+        std::cout << "Local Group Size used: " << localGroupSize << "\n";
+        
         const auto [result, queueFamilyIndex] = getBestComputeQueue(physDev);
         if (!queueFamilyIndex)
         {
