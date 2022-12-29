@@ -5,14 +5,19 @@
 #include <iostream>
 #include <optional>
 #include <ranges>
+#include <source_location>
 #include <span>
 
-#define BAIL_ON_BAD_RESULT(result)                                                                 \
-    if ((result) != VK_SUCCESS)                                                                    \
-    {                                                                                              \
-        fprintf(stderr, "Failure at %u %s\n", __LINE__, __FILE__);                                 \
-        exit(-1);                                                                                  \
+constexpr void BAIL_ON_BAD_RESULT(auto result,
+                                  std::source_location location = std::source_location::current())
+{
+    if (result != VK_SUCCESS)
+    {
+        std::cout << "Failure at line " << location.line() << " in " << location.file_name()
+                  << "\n";
+        exit(-1);
     }
+}
 
 namespace
 {
@@ -99,9 +104,7 @@ const static auto spirv = getSpirvFromFile("copy.comp.spv");
 
 int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t bufferLength)
 {
-    vk::StructureChain<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceSubgroupProperties> chain;
-
-    [[maybe_unused]] const auto props2 =
+    const auto props2 =
         physDev
             .getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceSubgroupProperties>();
     const auto subGroupProps = props2.get<vk::PhysicalDeviceSubgroupProperties>();
@@ -117,6 +120,7 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
             : bufferLength / (maxWorkGroupCountX * subGroupProps.subgroupSize) * 2;
 
     const auto localGroupSize = subGroupProps.subgroupSize * subgroupMultiplier;
+
     std::cout << "Local Group Size used: " << localGroupSize << "\n";
 
     const auto [result, queueFamilyIndex] = getBestComputeQueue(physDev);
@@ -139,7 +143,7 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
     const uint32_t bufferSize = sizeof(bufferData_t) * bufferLength;
     const auto memorySize = bufferSize * 2;
 
-    const auto memoryTypeIndex = [&props,memorySize]() -> std::optional<size_t> {
+    const auto memoryTypeIndex = [&props, memorySize]() -> std::optional<size_t> {
         for (const auto& k : std::views::iota(0u, props.memoryTypeCount))
         {
             std::cout << to_string(props.memoryTypes[k].propertyFlags) << "\n";
@@ -315,5 +319,6 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
         std::cout << "Input and Output differ at " << std::distance(copyOfInputData.begin(), i1)
                   << "/" << copyOfInputData.size() << "\n";
     }
+
     return 0;
 }
