@@ -39,7 +39,7 @@ std::expected<uint32_t, VkResult> getBestComputeQueue(
 
     const auto optimalQueue = std::ranges::find_if(queueFamilyProperties, computeWithoutGraphics);
     if (optimalQueue != queueFamilyProperties.end())
-        {
+    {
         return std::distance(queueFamilyProperties.begin(), optimalQueue);
     }
 
@@ -53,7 +53,7 @@ std::expected<uint32_t, VkResult> getBestComputeQueue(
 
     const auto computeQueue = std::ranges::find_if(queueFamilyProperties, hasCompute);
     if (computeQueue != queueFamilyProperties.end())
-        {
+    {
         return std::distance(queueFamilyProperties.begin(), computeQueue);
     }
 
@@ -176,7 +176,6 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
 
     const vk::raii::DeviceMemory memory(device, memoryAllocateInfo);
 
-    std::vector<bufferData_t> copyOfInputData;
     {
         auto* payload = static_cast<bufferData_t*>(memory.mapMemory(0, memorySize));
         if (!payload)
@@ -189,13 +188,12 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
                                 [](const auto& elem) { std::cout << elem << "\n"; }); */
         const auto inputSpan = payloadSpan.subspan(0, payloadSpan.size() / 2);
         const auto outputSpan = payloadSpan.subspan(inputSpan.size(), inputSpan.size());
+
         if (std::ranges::equal(inputSpan, outputSpan))
         {
             std::cout << "The memory already had equal values"
                       << "\n";
         }
-        copyOfInputData.resize(payloadSpan.size());
-        std::ranges::copy(payloadSpan, copyOfInputData.begin());
     }
 
     std::cout << to_string(memory.debugReportObjectType) << "\n";
@@ -305,7 +303,7 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
 
     const auto* payload =
         static_cast<bufferData_t*>(memory.mapMemory(0, memorySize, vk::MemoryMapFlags{0}));
-    const auto outputSpan = std::span(payload, copyOfInputData.size());
+    const auto outputSpan = std::span(payload, bufferLength * 2);
 
     assert(memorySize / sizeof(*payload) == outputSpan.size());
     const auto frontHalf = outputSpan.subspan(0, outputSpan.size() / 2);
@@ -319,13 +317,6 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
     if (p2 != backHalf.end())
     {
         std::cout << "Bad at " << std::distance(backHalf.begin(), p2) << "\n";
-    }
-
-    const auto [i1, i2] = std::ranges::mismatch(copyOfInputData, outputSpan);
-    if (i1 != copyOfInputData.end())
-    {
-        std::cout << "Input and Output differ at " << std::distance(copyOfInputData.begin(), i1)
-                  << "/" << copyOfInputData.size() << "\n";
     }
 
     return 0;
