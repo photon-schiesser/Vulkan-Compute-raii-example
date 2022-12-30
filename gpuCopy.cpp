@@ -111,6 +111,31 @@ const static auto spirv = getSpirvFromFile("copy.comp.spv");
 
 } // namespace
 
+void generateRandomDataOnDevice(const vk::raii::DeviceMemory& memory, const uint32_t memorySize)
+{
+    {
+        auto* payload = static_cast<bufferData_t*>(memory.mapMemory(0, memorySize));
+        if (!payload)
+        {
+            BAIL_ON_BAD_RESULT(VK_ERROR_OUT_OF_HOST_MEMORY);
+        }
+        auto payloadSpan = std::span(payload, memorySize / sizeof(*payload));
+        std::ranges::for_each(payloadSpan, [](auto& elem) { elem = std::rand(); });
+        /* std::ranges::for_each_n(payload, 10,
+                                [](const auto& elem) { std::cout << elem << "\n"; }); */
+        const auto inputSpan = payloadSpan.subspan(0, payloadSpan.size() / 2);
+        const auto outputSpan = payloadSpan.subspan(inputSpan.size(), inputSpan.size());
+
+        if (std::ranges::equal(inputSpan, outputSpan))
+        {
+            std::cout << "The memory already had equal values"
+                      << "\n";
+        }
+    }
+
+    memory.unmapMemory();
+}
+
 int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t bufferLength)
 {
     const auto props2 =
@@ -176,29 +201,9 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
 
     const vk::raii::DeviceMemory memory(device, memoryAllocateInfo);
 
-    {
-        auto* payload = static_cast<bufferData_t*>(memory.mapMemory(0, memorySize));
-        if (!payload)
-        {
-            BAIL_ON_BAD_RESULT(VK_ERROR_OUT_OF_HOST_MEMORY);
-        }
-        auto payloadSpan = std::span(payload, memorySize / sizeof(*payload));
-        std::ranges::for_each(payloadSpan, [](auto& elem) { elem = std::rand(); });
-        /* std::ranges::for_each_n(payload, 10,
-                                [](const auto& elem) { std::cout << elem << "\n"; }); */
-        const auto inputSpan = payloadSpan.subspan(0, payloadSpan.size() / 2);
-        const auto outputSpan = payloadSpan.subspan(inputSpan.size(), inputSpan.size());
-
-        if (std::ranges::equal(inputSpan, outputSpan))
-        {
-            std::cout << "The memory already had equal values"
-                      << "\n";
-        }
-    }
+    generateRandomDataOnDevice(memory, memorySize);
 
     std::cout << to_string(memory.debugReportObjectType) << "\n";
-
-    memory.unmapMemory();
 
     constexpr std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {
         vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1,
