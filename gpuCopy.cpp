@@ -22,41 +22,39 @@ constexpr void BAIL_ON_BAD_RESULT(auto result,
 
 namespace
 {
-std::expected<uint32_t, VkResult> getBestComputeQueue(const auto& physicalDevice)
+std::expected<uint32_t, VkResult> getBestComputeQueue(
+    const vk::raii::PhysicalDevice& physicalDevice)
 {
     const auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
-    using queueIndex_t = uint32_t;
     // first try and find a queue that has just the compute bit set
-    const auto queueIndices =
-        std::views::iota(queueIndex_t(0), queueIndex_t(queueFamilyProperties.size()));
-    for (const auto queueIndex : queueIndices)
-    {
-        const auto& prop = queueFamilyProperties[queueIndex];
+    auto computeWithoutGraphics = [](const auto& properties) {
         // mask out the sparse binding bit that we aren't caring about (yet!) and
         // the transfer bit
         const auto maskedFlags =
-            (~(vk::QueueFlagBits::eTransfer | vk::QueueFlagBits::eSparseBinding) & prop.queueFlags);
+            (~(vk::QueueFlagBits::eTransfer | vk::QueueFlagBits::eSparseBinding) &
+             properties.queueFlags);
+        return !(vk::QueueFlagBits::eGraphics & maskedFlags) &&
+               (vk::QueueFlagBits::eCompute & maskedFlags);
+    };
 
-        if (!(vk::QueueFlagBits::eGraphics & maskedFlags) &&
-            (vk::QueueFlagBits::eCompute & maskedFlags))
+    const auto optimalQueue = std::ranges::find_if(queueFamilyProperties, computeWithoutGraphics);
+    if (optimalQueue != queueFamilyProperties.end())
         {
-            return queueIndex;
-        }
+        return std::distance(queueFamilyProperties.begin(), optimalQueue);
     }
 
     // lastly get any queue that'll work for us
-    for (const auto queueIndex : queueIndices)
-    {
-        const auto& prop = queueFamilyProperties[queueIndex];
-        // mask out the sparse binding bit that we aren't caring about (yet!) and
-        // the transfer bit
+    auto hasCompute = [](const auto& properties) -> bool {
         const auto maskedFlags =
-            (~(vk::QueueFlagBits::eTransfer | vk::QueueFlagBits::eSparseBinding) & prop.queueFlags);
+            (~(vk::QueueFlagBits::eTransfer | vk::QueueFlagBits::eSparseBinding) &
+             properties.queueFlags);
+        return (vk::QueueFlagBits::eCompute & maskedFlags) && true;
+    };
 
-        if (vk::QueueFlagBits::eCompute & maskedFlags)
+    const auto computeQueue = std::ranges::find_if(queueFamilyProperties, hasCompute);
+    if (computeQueue != queueFamilyProperties.end())
         {
-            return queueIndex;
-        }
+        return std::distance(queueFamilyProperties.begin(), computeQueue);
     }
 
     return std::unexpected{VK_ERROR_INITIALIZATION_FAILED};
