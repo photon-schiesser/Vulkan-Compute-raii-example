@@ -82,7 +82,7 @@ auto getSpirvFromFile(const std::string_view filePath)
     std::vector<file_t> spvBuffer;
     {
         std::ifstream spirvFile(filePath.data(), std::ios::binary | std::ios::ate);
-        std::streamsize size = spirvFile.tellg();
+        const auto size = spirvFile.tellg();
         spirvFile.seekg(0, std::ios::beg);
 
         spvBuffer.resize(size);
@@ -94,12 +94,14 @@ auto getSpirvFromFile(const std::string_view filePath)
             exit(1);
         }
     }
-    std::vector<spirv_t> spirvFromFile;
     constexpr auto sizeDivisor = sizeof(spirv_t) / sizeof(file_t);
     static_assert(sizeDivisor != 0);
 
     spvBuffer.resize(sizeDivisor * div_up(spvBuffer.size(), sizeDivisor));
-    spirvFromFile.resize(spvBuffer.size() / sizeDivisor);
+
+    std::vector<spirv_t> spirvFromFile(spvBuffer.size() / sizeDivisor);
+    assert(spvBuffer.size() == spirvFromFile.size() * sizeDivisor);
+
     const auto start = reinterpret_cast<spirv_t*>(spvBuffer.data());
     std::copy(start, start + spirvFromFile.size(), spirvFromFile.data());
     return spirvFromFile;
