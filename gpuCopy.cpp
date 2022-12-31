@@ -270,6 +270,41 @@ auto allocateDescriptorSet(const auto& device, const auto& descriptorPool,
     vk::raii::DescriptorSet single = std::move(descriptorSets[0]);
     return single;
 }
+
+auto makeBoundBuffers(const auto& device, const auto& memory, const uint32_t queueFamilyIndex,
+                      const uint32_t bufferSize)
+{
+    const std::array indices = {queueFamilyIndex};
+    const auto bufferCreateInfo = vk::BufferCreateInfo(vk::BufferCreateFlags(), bufferSize,
+                                                       vk::BufferUsageFlagBits::eStorageBuffer,
+                                                       vk::SharingMode::eExclusive, indices);
+    auto in_buffer = vk::raii::Buffer(device, bufferCreateInfo);
+
+    auto out_buffer = vk::raii::Buffer(device, bufferCreateInfo);
+
+    in_buffer.bindMemory(*memory, 0);
+
+    out_buffer.bindMemory(*memory, bufferSize);
+    return std::make_pair(std::move(in_buffer), std::move(out_buffer));
+}
+
+void updateDescriptorSetsWithBufferInfo(const auto& device, const auto& in_buffer,
+                                        const auto& out_buffer, const auto& descriptorSet)
+{
+    const auto in_descriptorBufferInfo = vk::DescriptorBufferInfo(*in_buffer, 0, VK_WHOLE_SIZE);
+    const auto out_descriptorBufferInfo = vk::DescriptorBufferInfo(*out_buffer, 0, VK_WHOLE_SIZE);
+
+    constexpr auto inBindingIndex = 0;
+    constexpr auto outBindingIndex = 1;
+    const std::array writeDescriptorSet = {
+        vk::WriteDescriptorSet(*descriptorSet, inBindingIndex, 0, 1,
+                               vk::DescriptorType::eStorageBuffer, nullptr,
+                               &in_descriptorBufferInfo),
+        vk::WriteDescriptorSet(*descriptorSet, outBindingIndex, 0, 1,
+                               vk::DescriptorType::eStorageBuffer, nullptr,
+                               &out_descriptorBufferInfo)};
+    device.updateDescriptorSets(writeDescriptorSet, {});
+}
 } // namespace
 
 int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t bufferLength)
@@ -310,31 +345,11 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
 
     const auto descriptorSet = allocateDescriptorSet(device, descriptorPool, descriptorSetLayout);
     // Create in/out buffers with descriptors and bind to memory
-    const std::array indices = {*queueFamilyIndex};
-    const auto bufferCreateInfo = vk::BufferCreateInfo(vk::BufferCreateFlags(), bufferSize,
-                                                       vk::BufferUsageFlagBits::eStorageBuffer,
-                                                       vk::SharingMode::eExclusive, indices);
-    const auto in_buffer = vk::raii::Buffer(device, bufferCreateInfo);
 
-    const auto out_buffer = vk::raii::Buffer(device, bufferCreateInfo);
+    const auto [in_buffer, out_buffer] =
+        makeBoundBuffers(device, memory, *queueFamilyIndex, bufferSize);
 
-    in_buffer.bindMemory(*memory, 0);
-
-    out_buffer.bindMemory(*memory, bufferSize);
-
-    const auto in_descriptorBufferInfo = vk::DescriptorBufferInfo(*in_buffer, 0, VK_WHOLE_SIZE);
-    const auto out_descriptorBufferInfo = vk::DescriptorBufferInfo(*out_buffer, 0, VK_WHOLE_SIZE);
-
-    constexpr auto inBindingIndex = 0;
-    constexpr auto outBindingIndex = 1;
-    const std::array writeDescriptorSet = {
-        vk::WriteDescriptorSet(*descriptorSet, inBindingIndex, 0, 1,
-                               vk::DescriptorType::eStorageBuffer, nullptr,
-                               &in_descriptorBufferInfo),
-        vk::WriteDescriptorSet(*descriptorSet, outBindingIndex, 0, 1,
-                               vk::DescriptorType::eStorageBuffer, nullptr,
-                               &out_descriptorBufferInfo)};
-    device.updateDescriptorSets(writeDescriptorSet, {});
+    updateDescriptorSetsWithBufferInfo(device, in_buffer, out_buffer, descriptorSet);
 
     const auto commandPool = vk::raii::CommandPool(
         device, vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlags(), *queueFamilyIndex));
