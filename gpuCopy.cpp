@@ -120,10 +120,9 @@ void generateRandomDataOnDevice(const vk::raii::DeviceMemory& memory, const uint
             BAIL_ON_BAD_RESULT(VK_ERROR_OUT_OF_HOST_MEMORY);
         }
         auto payloadSpan = std::span(payload, memorySize / sizeof(*payload));
-        std::ranges::for_each(payloadSpan, [](auto& elem) { elem = std::rand(); });
-        /* std::ranges::for_each_n(payload, 10,
-                                [](const auto& elem) { std::cout << elem << "\n"; }); */
-        const auto inputSpan = payloadSpan.subspan(0, payloadSpan.size() / 2);
+        auto inputSpan = payloadSpan.subspan(0, payloadSpan.size() / 2);
+        std::generate(inputSpan.begin(),inputSpan.end(),std::rand);
+
         const auto outputSpan = payloadSpan.subspan(inputSpan.size(), inputSpan.size());
 
         if (std::ranges::equal(inputSpan, outputSpan))

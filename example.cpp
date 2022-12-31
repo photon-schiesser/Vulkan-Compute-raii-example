@@ -22,7 +22,7 @@ int copyTest()
     const vk::raii::Context context;
     const auto instance = vk::raii::Instance(context, instanceCreateInfo);
 
-    constexpr uint32_t bufferLength = 16384 * 2 * 16 * 2;
+    constexpr uint32_t bufferLength = 16384 * 128*4;
 
     [[maybe_unused]] const auto physicalDevices = instance.enumeratePhysicalDevices();
 
