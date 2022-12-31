@@ -226,9 +226,11 @@ auto makePipelineLayout(const auto& device, const auto& descriptorSetLayout)
     return vk::raii::PipelineLayout(device, pipelineCreateInfo);
 }
 
-auto makePipeline(const auto& device, const auto& shaderModule, const auto& pipelineLayout,
+auto makePipeline(const auto& device, const auto& pipelineLayout,
                   const uint32_t localGroupSize)
 {
+    const auto shaderModule = vk::raii::ShaderModule(
+        device, vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), spirv));
     const auto specializationEntry =
         vk::SpecializationMapEntry({.constantID = 0, .offset = 0, .size = sizeof(localGroupSize)});
     const auto specializationInfo =
@@ -336,10 +338,7 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
     const auto descriptorSetLayout = makeDescriptorSetLayout(device);
     const auto pipelineLayout = makePipelineLayout(device, descriptorSetLayout);
 
-    const auto shaderModule = vk::raii::ShaderModule(
-        device, vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), spirv));
-
-    const auto pipeline = makePipeline(device, shaderModule, pipelineLayout, localGroupSize);
+    const auto pipeline = makePipeline(device, pipelineLayout, localGroupSize);
 
     const auto descriptorPool = makeDescriptorPool(device);
 
