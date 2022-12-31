@@ -200,6 +200,7 @@ auto getDeviceMemory(const vk::raii::Device& device,
             std::cout << to_string(props.memoryTypes[k].propertyFlags) << "\n";
             if ((vk::MemoryPropertyFlagBits::eHostVisible & props.memoryTypes[k].propertyFlags) &&
                 (vk::MemoryPropertyFlagBits::eHostCoherent & props.memoryTypes[k].propertyFlags) &&
+                (vk::MemoryPropertyFlagBits::eDeviceLocal & props.memoryTypes[k].propertyFlags) &&
                 (memorySize < props.memoryHeaps[props.memoryTypes[k].heapIndex].size))
             {
                 return k;
