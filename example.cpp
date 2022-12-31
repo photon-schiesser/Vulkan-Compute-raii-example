@@ -22,7 +22,7 @@ int copyTest()
     const vk::raii::Context context;
     const auto instance = vk::raii::Instance(context, instanceCreateInfo);
 
-    constexpr uint32_t bufferLength = 16384 * 128*4;
+    constexpr uint32_t bufferLength = 16384 * 256;
 
     [[maybe_unused]] const auto physicalDevices = instance.enumeratePhysicalDevices();
 
@@ -40,7 +40,7 @@ int main()
     copyTest();
     const auto stop = clock.now();
 
-    std::cout << "Duration: " << std::chrono::duration<double, std::milli>(stop - start).count()
-              << "\n";
+    std::cout << "Overall Duration: "
+              << std::chrono::duration<double, std::milli>(stop - start).count() << "\n";
     return 0;
 }

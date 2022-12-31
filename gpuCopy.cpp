@@ -1,10 +1,13 @@
 #include "gpuCopy.h"
 
 #include <array>
+#include <chrono>
+#include <execution>
 #include <expected>
 #include <fstream>
 #include <iostream>
 #include <optional>
+#include <random>
 #include <ranges>
 #include <source_location>
 #include <span>
@@ -75,6 +78,13 @@ size_t nextPowerOf2(size_t n)
     return v;
 }
 
+auto elapsedSince(const auto start)
+{
+    return std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() -
+                                                     start)
+        .count();
+}
+
 auto getSpirvFromFile(const std::string_view filePath)
 {
     using spirv_t = uint32_t;
@@ -108,28 +118,26 @@ auto getSpirvFromFile(const std::string_view filePath)
 }
 
 const static auto spirv = getSpirvFromFile("copy.comp.spv");
-
+using bufferData_t = int32_t;
 } // namespace
 
 void generateRandomDataOnDevice(const vk::raii::DeviceMemory& memory, const uint32_t memorySize)
 {
+    auto* payload = static_cast<bufferData_t*>(memory.mapMemory(0, memorySize));
+    if (!payload)
     {
-        auto* payload = static_cast<bufferData_t*>(memory.mapMemory(0, memorySize));
-        if (!payload)
-        {
-            BAIL_ON_BAD_RESULT(VK_ERROR_OUT_OF_HOST_MEMORY);
-        }
-        auto payloadSpan = std::span(payload, memorySize / sizeof(*payload));
-        auto inputSpan = payloadSpan.subspan(0, payloadSpan.size() / 2);
-        std::generate(inputSpan.begin(),inputSpan.end(),std::rand);
+        BAIL_ON_BAD_RESULT(VK_ERROR_OUT_OF_HOST_MEMORY);
+    }
+    auto payloadSpan = std::span(payload, memorySize / sizeof(*payload));
+    auto inputSpan = payloadSpan.subspan(0, payloadSpan.size() / 2);
+    auto rng = std::mt19937(std::chrono::steady_clock::now().time_since_epoch().count());
+    std::generate(inputSpan.begin(), inputSpan.end(), rng);
+    const auto outputSpan = payloadSpan.subspan(inputSpan.size(), inputSpan.size());
 
-        const auto outputSpan = payloadSpan.subspan(inputSpan.size(), inputSpan.size());
-
-        if (std::ranges::equal(inputSpan, outputSpan))
-        {
-            std::cout << "The memory already had equal values"
-                      << "\n";
-        }
+    if (std::ranges::equal(inputSpan, outputSpan))
+    {
+        std::cout << "The memory already had equal values"
+                  << "\n";
     }
 
     memory.unmapMemory();
@@ -200,7 +208,13 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
 
     const vk::raii::DeviceMemory memory(device, memoryAllocateInfo);
 
-    generateRandomDataOnDevice(memory, memorySize);
+    const auto clock = std::chrono::high_resolution_clock();
+    {
+        const auto start = clock.now();
+        generateRandomDataOnDevice(memory, memorySize);
+        const auto elapsed = elapsedSince(start);
+        std::cout << "Random data generation duration: " << elapsed << "\n";
+    }
 
     std::cout << to_string(memory.debugReportObjectType) << "\n";
 
@@ -300,27 +314,44 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
     constexpr auto queueIndex = 0;
     const auto queue = vk::raii::Queue(device, *queueFamilyIndex, queueIndex);
 
-    std::ranges::for_each(std::views::iota(1, 2), [&](auto) {
-        queue.submit(vk::SubmitInfo(nullptr, nullptr, *commandBuffer));
-        queue.waitIdle();
-    });
+    constexpr size_t numberOfQueueSubmissions = 10;
+    {
+        const auto start = clock.now();
+        std::ranges::for_each(std::views::iota(0u, numberOfQueueSubmissions), [&](auto) {
+            queue.submit(vk::SubmitInfo(nullptr, nullptr, *commandBuffer));
+            queue.waitIdle();
+        });
+        const auto elapsed = elapsedSince(start);
+        std::cout << "Duration of copying data " << numberOfQueueSubmissions
+                  << " times on GPU: " << elapsed << "\n";
+    }
 
-    const auto* payload =
-        static_cast<bufferData_t*>(memory.mapMemory(0, memorySize, vk::MemoryMapFlags{0}));
+    const auto* payload = static_cast<bufferData_t*>(memory.mapMemory(0, memorySize));
     const auto outputSpan = std::span(payload, bufferLength * 2);
 
     assert(memorySize / sizeof(*payload) == outputSpan.size());
     const auto frontHalf = outputSpan.subspan(0, outputSpan.size() / 2);
     const auto backHalf = outputSpan.subspan(frontHalf.size(), frontHalf.size());
 
-    const auto [p1, p2] = std::ranges::mismatch(frontHalf, backHalf);
-    if (p1 != frontHalf.end())
+    // Let's just assume that if something went wrong, the first few front and back values wouldn't
+    // match. This saves us from having to check the whole range every time.
+    constexpr size_t numElementsToCheck = 100;
+    const auto firstElementsEqual =
+        std::ranges::equal(frontHalf.first(numElementsToCheck), backHalf.first(numElementsToCheck));
+    const auto lastElementsEqual =
+        std::ranges::equal(frontHalf.last(numElementsToCheck), backHalf.last(numElementsToCheck));
+    if (!(firstElementsEqual && lastElementsEqual))
     {
-        std::cout << "Bad at " << std::distance(frontHalf.begin(), p1) << "\n";
-    }
-    if (p2 != backHalf.end())
-    {
-        std::cout << "Bad at " << std::distance(backHalf.begin(), p2) << "\n";
+        const auto [p1, p2] = std::ranges::mismatch(frontHalf, backHalf);
+
+        if (p1 != frontHalf.end())
+        {
+            std::cout << "Bad at " << std::distance(frontHalf.begin(), p1) << "\n";
+        }
+        if (p2 != backHalf.end())
+        {
+            std::cout << "Bad at " << std::distance(backHalf.begin(), p2) << "\n";
+        }
     }
 
     return 0;
