@@ -120,15 +120,29 @@ auto getSpirvFromFile(const std::string_view filePath)
 const static auto spirv = getSpirvFromFile("copy.comp.spv");
 using bufferData_t = int32_t;
 
-void generateRandomDataOnDevice(const vk::raii::DeviceMemory& memory, const uint32_t memorySize)
+uint32_t requiredMemorySize(const uint32_t singleBufferLength)
 {
-    auto* payload = static_cast<bufferData_t*>(memory.mapMemory(0, memorySize));
+    const uint32_t bufferSize = sizeof(bufferData_t) * singleBufferLength;
+    const auto memorySize = bufferSize * 2;
+    return memorySize;
+}
+
+auto mapAllRequiredMemory(const auto& memory, const uint32_t singleBufferLength)
+{
+    auto* payload = static_cast<bufferData_t*>(
+        memory.mapMemory(0, requiredMemorySize(singleBufferLength)));
     if (!payload)
     {
         BAIL_ON_BAD_RESULT(VK_ERROR_OUT_OF_HOST_MEMORY);
     }
-    auto payloadSpan = std::span(payload, memorySize / sizeof(*payload));
-    auto inputSpan = payloadSpan.subspan(0, payloadSpan.size() / 2);
+    return std::span(payload, singleBufferLength * 2);
+}
+
+void generateRandomDataOnDevice(const vk::raii::DeviceMemory& memory,
+                                const uint32_t singleBufferLength)
+{
+    auto payloadSpan = mapAllRequiredMemory(memory, singleBufferLength);
+    auto inputSpan = payloadSpan.subspan(0, singleBufferLength);
     auto rng = std::mt19937(std::chrono::steady_clock::now().time_since_epoch().count());
     std::generate(inputSpan.begin(), inputSpan.end(), rng);
     const auto outputSpan = payloadSpan.subspan(inputSpan.size(), inputSpan.size());
@@ -226,8 +240,7 @@ auto makePipelineLayout(const auto& device, const auto& descriptorSetLayout)
     return vk::raii::PipelineLayout(device, pipelineCreateInfo);
 }
 
-auto makePipeline(const auto& device, const auto& pipelineLayout,
-                  const uint32_t localGroupSize)
+auto makePipeline(const auto& device, const auto& pipelineLayout, const uint32_t localGroupSize)
 {
     const auto shaderModule = vk::raii::ShaderModule(
         device, vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), spirv));
@@ -274,9 +287,10 @@ auto allocateDescriptorSet(const auto& device, const auto& descriptorPool,
 }
 
 auto makeBoundBuffers(const auto& device, const auto& memory, const uint32_t queueFamilyIndex,
-                      const uint32_t bufferSize)
+                      const uint32_t bufferLength)
 {
     const std::array indices = {queueFamilyIndex};
+    const auto bufferSize = requiredMemorySize(bufferLength)/2;
     const auto bufferCreateInfo = vk::BufferCreateInfo(vk::BufferCreateFlags(), bufferSize,
                                                        vk::BufferUsageFlagBits::eStorageBuffer,
                                                        vk::SharingMode::eExclusive, indices);
@@ -307,6 +321,31 @@ void updateDescriptorSetsWithBufferInfo(const auto& device, const auto& in_buffe
                                &out_descriptorBufferInfo)};
     device.updateDescriptorSets(writeDescriptorSet, {});
 }
+
+auto makeAndRecordCommandBuffer(const auto& device, const auto& pipeline,
+                                const auto& pipelineLayout, const auto& descriptorSet,
+                                const uint32_t queueFamilyIndex, const size_t groupCountX)
+{
+    auto commandPool = vk::raii::CommandPool(
+        device, vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlags(), queueFamilyIndex));
+    constexpr auto commandBuffersCount = 1;
+    auto commandBuffers = vk::raii::CommandBuffers(
+        device, vk::CommandBufferAllocateInfo(*commandPool, vk::CommandBufferLevel::ePrimary,
+                                              commandBuffersCount));
+
+    auto& commandBuffer = commandBuffers.front();
+    commandBuffer.begin(
+        vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eRenderPassContinue));
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, *pipeline);
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *pipelineLayout, 0,
+                                     *descriptorSet, nullptr);
+
+    commandBuffer.dispatch(groupCountX, 1, 1);
+    commandBuffer.end();
+    // apparently the order here is important: there must be a valid command pool by the time the
+    // command buffer is destroyed (so the command buffer must be destroyed first)
+    return std::make_pair(std::move(commandPool), std::move(commandBuffer));
+}
 } // namespace
 
 int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t bufferLength)
@@ -320,15 +359,14 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
 
     const auto device = getDevice(physDev, *queueFamilyIndex);
 
-    const uint32_t bufferSize = sizeof(bufferData_t) * bufferLength;
-    const auto memorySize = bufferSize * 2;
+    const auto memorySize = requiredMemorySize(bufferLength);
 
     const auto memory = getDeviceMemory(device, physDev.getMemoryProperties(), memorySize);
 
     const auto clock = std::chrono::high_resolution_clock();
     {
         const auto start = clock.now();
-        generateRandomDataOnDevice(memory, memorySize);
+        generateRandomDataOnDevice(memory, bufferLength);
         const auto elapsed = elapsedSince(start);
         std::cout << "Random data generation duration: " << elapsed << "\n";
     }
@@ -344,30 +382,14 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
 
     const auto descriptorSet = allocateDescriptorSet(device, descriptorPool, descriptorSetLayout);
     // Create in/out buffers with descriptors and bind to memory
-
     const auto [in_buffer, out_buffer] =
-        makeBoundBuffers(device, memory, *queueFamilyIndex, bufferSize);
+        makeBoundBuffers(device, memory, *queueFamilyIndex, bufferLength);
 
     updateDescriptorSetsWithBufferInfo(device, in_buffer, out_buffer, descriptorSet);
 
-    const auto commandPool = vk::raii::CommandPool(
-        device, vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlags(), *queueFamilyIndex));
-
-    constexpr auto commandBuffersCount = 1;
-    const auto commandBuffers = vk::raii::CommandBuffers(
-        device, vk::CommandBufferAllocateInfo(*commandPool, vk::CommandBufferLevel::ePrimary,
-                                              commandBuffersCount));
-
-    const auto& commandBuffer = commandBuffers.front();
-    commandBuffer.begin(
-        vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eRenderPassContinue));
-    commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, *pipeline);
-    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *pipelineLayout, 0,
-                                     *descriptorSet, nullptr);
-
-    commandBuffer.dispatch(bufferLength / localGroupSize, 1, 1);
-    commandBuffer.end();
-
+    const auto [commandPool, commandBuffer] =
+        makeAndRecordCommandBuffer(device, pipeline, pipelineLayout, descriptorSet,
+                                   *queueFamilyIndex, bufferLength / localGroupSize);
     constexpr auto queueIndex = 0;
     const auto queue = vk::raii::Queue(device, *queueFamilyIndex, queueIndex);
 
@@ -383,10 +405,9 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
                   << " times on GPU: " << elapsed << "\n";
     }
 
-    const auto* payload = static_cast<bufferData_t*>(memory.mapMemory(0, memorySize));
-    const auto outputSpan = std::span(payload, bufferLength * 2);
+    const auto outputSpan = mapAllRequiredMemory(memory, bufferLength);
 
-    assert(memorySize / sizeof(*payload) == outputSpan.size());
+    assert(memorySize / sizeof(outputSpan.front()) == outputSpan.size());
     const auto frontHalf = outputSpan.subspan(0, outputSpan.size() / 2);
     const auto backHalf = outputSpan.subspan(frontHalf.size(), frontHalf.size());
 
