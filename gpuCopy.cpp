@@ -119,7 +119,6 @@ auto getSpirvFromFile(const std::string_view filePath)
 
 const static auto spirv = getSpirvFromFile("copy.comp.spv");
 using bufferData_t = int32_t;
-} // namespace
 
 void generateRandomDataOnDevice(const vk::raii::DeviceMemory& memory, const uint32_t memorySize)
 {
@@ -143,7 +142,7 @@ void generateRandomDataOnDevice(const vk::raii::DeviceMemory& memory, const uint
     memory.unmapMemory();
 }
 
-int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t bufferLength)
+uint32_t getLocalGroupSize(const vk::raii::PhysicalDevice& physDev, const uint32_t bufferLength)
 {
     const auto props2 =
         physDev
@@ -163,26 +162,24 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
     const uint32_t localGroupSize = subGroupProps.subgroupSize * subgroupMultiplier;
 
     std::cout << "Local Group Size used: " << localGroupSize << "\n";
+    return localGroupSize;
+}
 
-    const auto queueFamilyIndex = getBestComputeQueue(physDev);
-    if (!queueFamilyIndex)
-    {
-        BAIL_ON_BAD_RESULT(queueFamilyIndex.error());
-    }
-
+auto getDevice(const vk::raii::PhysicalDevice& physDev, const auto queueFamilyIndex)
+{
     constexpr std::array queuePrioritory = {1.0f};
     const auto deviceQueueCreateInfo =
-        vk::DeviceQueueCreateInfo(vk::DeviceQueueCreateFlags(), *queueFamilyIndex, queuePrioritory);
+        vk::DeviceQueueCreateInfo(vk::DeviceQueueCreateFlags(), queueFamilyIndex, queuePrioritory);
 
     const std::array queueInfos = {deviceQueueCreateInfo};
     const auto deviceCreateInfo = vk::DeviceCreateInfo(vk::DeviceCreateFlags(), queueInfos);
 
-    const auto device = vk::raii::Device(physDev, deviceCreateInfo);
-    const auto props = physDev.getMemoryProperties();
+    return vk::raii::Device(physDev, deviceCreateInfo);
+}
 
-    const uint32_t bufferSize = sizeof(bufferData_t) * bufferLength;
-    const auto memorySize = bufferSize * 2;
-
+auto getDeviceMemory(const vk::raii::Device& device,
+                     const vk::PhysicalDeviceMemoryProperties& props, const uint32_t memorySize)
+{
     const auto memoryTypeIndex = [&props, memorySize]() -> std::optional<size_t> {
         for (const auto& k : std::views::iota(0u, props.memoryTypeCount))
         {
@@ -206,7 +203,25 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
 
     const vk::MemoryAllocateInfo memoryAllocateInfo(memorySize, *memoryTypeIndex);
 
-    const vk::raii::DeviceMemory memory(device, memoryAllocateInfo);
+    return vk::raii::DeviceMemory(device, memoryAllocateInfo);
+}
+} // namespace
+
+int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t bufferLength)
+{
+    const auto localGroupSize = getLocalGroupSize(physDev, bufferLength);
+    const auto queueFamilyIndex = getBestComputeQueue(physDev);
+    if (!queueFamilyIndex)
+    {
+        BAIL_ON_BAD_RESULT(queueFamilyIndex.error());
+    }
+
+    const auto device = getDevice(physDev, *queueFamilyIndex);
+
+    const uint32_t bufferSize = sizeof(bufferData_t) * bufferLength;
+    const auto memorySize = bufferSize * 2;
+
+    const auto memory = getDeviceMemory(device, physDev.getMemoryProperties(), memorySize);
 
     const auto clock = std::chrono::high_resolution_clock();
     {
