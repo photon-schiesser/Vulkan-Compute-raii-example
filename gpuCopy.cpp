@@ -414,7 +414,7 @@ int copyUsingDevice(const vk::raii::PhysicalDevice& physDev, const uint32_t buff
 
     // Let's just assume that if something went wrong, the first few front and back values wouldn't
     // match. This saves us from having to check the whole range every time.
-    constexpr size_t numElementsToCheck = 100;
+    const size_t numElementsToCheck = std::min(100u, bufferLength);
     const auto firstElementsEqual =
         std::ranges::equal(frontHalf.first(numElementsToCheck), backHalf.first(numElementsToCheck));
     const auto lastElementsEqual =
