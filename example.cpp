@@ -3,7 +3,7 @@
 #include <chrono>
 #include <iostream>
 
-int copyTest()
+void copyTest()
 {
     constexpr vk::ApplicationInfo applicationInfo = []() {
         vk::ApplicationInfo temp;
@@ -30,7 +30,6 @@ int copyTest()
     {
         copyUsingDevice(physDev, bufferLength);
     }
-    return 0;
 }
 
 int main()
