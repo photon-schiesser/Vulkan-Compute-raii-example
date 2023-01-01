@@ -10,7 +10,7 @@ I started out by converting that example to use the Vulkan C++ RAII interface pr
 ## Additional changes
 The first thing I had to do was to set up a build system. I chose cmake and figured out how to add the Vulkan SDK library.
 
-After converting the example to C++, I wanted to understand what the shader code was doing. I actually decompiled the SPIR-V code in the makeSpirvCode.h file to GLSL. This helped me understand how certain parts of the C++ code was mirroring the shader code (like the buffer descriptors).
+After converting the example to C++, I wanted to understand what the shader code was doing. I actually decompiled the SPIR-V code in the makeSpirvCode.h file to GLSL. This helped me understand how certain parts of the C++ code were mirroring the shader code (like the buffer descriptors).
 
 I wanted to change the shader code, so I added the capability to compile the compute shader to the cmake file. 
 
