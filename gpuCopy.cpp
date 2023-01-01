@@ -129,8 +129,8 @@ uint32_t requiredMemorySize(const uint32_t singleBufferLength)
 
 auto mapAllRequiredMemory(const auto& memory, const uint32_t singleBufferLength)
 {
-    auto* payload = static_cast<bufferData_t*>(
-        memory.mapMemory(0, requiredMemorySize(singleBufferLength)));
+    auto* payload =
+        static_cast<bufferData_t*>(memory.mapMemory(0, requiredMemorySize(singleBufferLength)));
     if (!payload)
     {
         BAIL_ON_BAD_RESULT(VK_ERROR_OUT_OF_HOST_MEMORY);
@@ -291,7 +291,7 @@ auto makeBoundBuffers(const auto& device, const auto& memory, const uint32_t que
                       const uint32_t bufferLength)
 {
     const std::array indices = {queueFamilyIndex};
-    const auto bufferSize = requiredMemorySize(bufferLength)/2;
+    const auto bufferSize = requiredMemorySize(bufferLength) / 2;
     const auto bufferCreateInfo = vk::BufferCreateInfo(vk::BufferCreateFlags(), bufferSize,
                                                        vk::BufferUsageFlagBits::eStorageBuffer,
                                                        vk::SharingMode::eExclusive, indices);
