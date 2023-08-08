@@ -15,3 +15,6 @@ After converting the example to C++, I wanted to understand what the shader code
 I wanted to change the shader code, so I added the capability to compile the compute shader to the cmake file. 
 
 The first customization I made to the shader was to allow the application to specify the group size in the shader. This required binding specialization constants in the pipeline on the C++ side. 
+
+## Setup
+[Setup](SETUP.md) - Follow this guide to set up your environment and run the example program.
