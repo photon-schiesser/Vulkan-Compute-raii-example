@@ -1,2 +1,5 @@
-# build dir
-/cmake-build/*
+build/
+.vscode/
+
+# build dir in guide
+cmake-build/
