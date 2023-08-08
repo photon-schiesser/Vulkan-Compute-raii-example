@@ -5,6 +5,10 @@ project("compute-pipeline")
 set(CMAKE_CXX_STANDARD_REQUIRED 23)
 set(CMAKE_CXX_STANDARD 23)
 
+#include the vulkan sdk headers
+#include_directories("/home/user/vulkanSDK-1.3.239.0/x86_64/include/")
+include_directories( ${CMAKE_INCLUDE_PATH}/include )
+
 find_package(Vulkan REQUIRED)
 
 add_executable(example example.cpp makeSpirvCode.cpp gpuCopy.cpp)
@@ -29,4 +33,4 @@ add_custom_command(
 add_custom_target(ComputeShader DEPENDS "${CMAKE_BINARY_DIR}/copy.comp.spv")
 add_dependencies(example ComputeShader)
 
-target_precompile_headers(example PUBLIC /usr/include/vulkan/vulkan.hpp PUBLIC /usr/include/vulkan/vulkan_raii.hpp)
+target_precompile_headers(example PUBLIC ${CMAKE_INCLUDE_PATH}/include/vulkan/vulkan.hpp PUBLIC ${CMAKE_INCLUDE_PATH}/include/vulkan/vulkan_raii.hpp)
