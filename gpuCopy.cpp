@@ -336,7 +336,7 @@ auto makeAndRecordCommandBuffer(const auto& device, const auto& pipeline,
 
     auto& commandBuffer = commandBuffers.front();
     commandBuffer.begin(
-        vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eRenderPassContinue));
+        vk::CommandBufferBeginInfo());
     commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, *pipeline);
     commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *pipelineLayout, 0,
                                      *descriptorSet, nullptr);
